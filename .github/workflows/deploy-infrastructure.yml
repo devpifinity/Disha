@@ -25,6 +25,11 @@ on:
           - deploy
           - diff
           - destroy
+      branch:
+        description: 'Branch to deploy from'
+        required: false
+        default: 'main'
+        type: string
 
 concurrency:
   group: deploy-infrastructure-${{ github.ref_name }}-${{ inputs.environment || (github.ref_name == 'main' && 'prod' || 'dev') }}
@@ -69,6 +74,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

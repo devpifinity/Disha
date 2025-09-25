@@ -10,6 +10,11 @@ on:
         type: choice
         options:
           - production
+      branch:
+        description: 'Branch to deploy from'
+        required: false
+        default: 'main'
+        type: string
 
 concurrency:
   group: deploy-prod
@@ -21,6 +26,7 @@ jobs:
     uses: ./.github/workflows/quality-checks.yml
     with:
       node-version: '18'
+      branch: ${{ inputs.branch || 'main' }}
 
   deploy-prod:
     name: Deploy to Production
@@ -35,6 +41,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || 'main' }}
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
