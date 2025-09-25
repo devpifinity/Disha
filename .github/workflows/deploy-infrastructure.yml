@@ -91,7 +91,7 @@ jobs:
 
       - name: Install CDK dependencies
         working-directory: infrastructure/cdk
-        run: npm ci
+        run: npm install
 
       - name: Build CDK
         working-directory: infrastructure/cdk
