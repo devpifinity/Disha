@@ -1,9 +1,15 @@
 name: Deploy to Development
 
 on:
-  push:
-    branches: [develop]
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Confirm deployment to Development'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
 
 concurrency:
   group: deploy-dev
