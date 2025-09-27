@@ -45,6 +45,7 @@ export class S3Website extends Construct {
 
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
       comment: `Disha Career Platform - ${props.environment}`,
+      defaultRootObject: props.indexDocument || 'index.html',
       defaultBehavior: {
         origin: new origins.S3Origin(this.bucket, {
           originAccessIdentity,
