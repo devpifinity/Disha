@@ -21,12 +21,11 @@ export class S3Website extends Construct {
   constructor(scope: Construct, id: string, props: S3WebsiteProps) {
     super(scope, id);
 
-    // Create S3 bucket for website content
+    // Create S3 bucket for website content (using OAI, not website hosting)
     this.bucket = new s3.Bucket(this, 'WebsiteBucket', {
       bucketName: props.bucketName,
-      websiteIndexDocument: props.indexDocument || 'index.html',
-      websiteErrorDocument: props.errorDocument || 'index.html', // SPA routing
-      publicReadAccess: false, // CloudFront will handle access
+      // Removed websiteIndexDocument and websiteErrorDocument to use OAI pattern
+      publicReadAccess: false, // CloudFront will handle access via OAI
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       removalPolicy: props.environment === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
       versioned: props.environment === 'prod',
