@@ -157,7 +157,7 @@ jobs:
       - name: Set GitHub Repository Variables
         if: inputs.action != 'destroy'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN || github.token }}
         run: |
           # Set environment-specific variable names
           ENV_SUFFIX=""
@@ -167,15 +167,29 @@ jobs:
             ENV_SUFFIX="_PROD"
           fi
           
-          # Set repository variables using GitHub CLI
-          gh variable set "S3_BUCKET_NAME${ENV_SUFFIX}" --body "$S3_BUCKET_NAME"
-          gh variable set "CLOUDFRONT_DISTRIBUTION_ID${ENV_SUFFIX}" --body "$CLOUDFRONT_DISTRIBUTION_ID"
-          gh variable set "WEBSITE_URL${ENV_SUFFIX}" --body "$WEBSITE_URL"
+          # Try to set repository variables using GitHub CLI
+          echo "🔧 Attempting to set repository variables..."
           
-          echo "✅ Repository variables set successfully:"
-          echo "- S3_BUCKET_NAME${ENV_SUFFIX}: $S3_BUCKET_NAME"
-          echo "- CLOUDFRONT_DISTRIBUTION_ID${ENV_SUFFIX}: $CLOUDFRONT_DISTRIBUTION_ID"
-          echo "- WEBSITE_URL${ENV_SUFFIX}: $WEBSITE_URL"
+          if gh variable set "S3_BUCKET_NAME${ENV_SUFFIX}" --body "$S3_BUCKET_NAME" 2>/dev/null; then
+            echo "✅ S3_BUCKET_NAME${ENV_SUFFIX} set successfully"
+          else
+            echo "⚠️  Failed to set S3_BUCKET_NAME${ENV_SUFFIX} - insufficient permissions"
+            echo "📋 Manual setup required: S3_BUCKET_NAME${ENV_SUFFIX} = $S3_BUCKET_NAME"
+          fi
+          
+          if gh variable set "CLOUDFRONT_DISTRIBUTION_ID${ENV_SUFFIX}" --body "$CLOUDFRONT_DISTRIBUTION_ID" 2>/dev/null; then
+            echo "✅ CLOUDFRONT_DISTRIBUTION_ID${ENV_SUFFIX} set successfully"
+          else
+            echo "⚠️  Failed to set CLOUDFRONT_DISTRIBUTION_ID${ENV_SUFFIX} - insufficient permissions"
+            echo "📋 Manual setup required: CLOUDFRONT_DISTRIBUTION_ID${ENV_SUFFIX} = $CLOUDFRONT_DISTRIBUTION_ID"
+          fi
+          
+          if gh variable set "WEBSITE_URL${ENV_SUFFIX}" --body "$WEBSITE_URL" 2>/dev/null; then
+            echo "✅ WEBSITE_URL${ENV_SUFFIX} set successfully"
+          else
+            echo "⚠️  Failed to set WEBSITE_URL${ENV_SUFFIX} - insufficient permissions"
+            echo "📋 Manual setup required: WEBSITE_URL${ENV_SUFFIX} = $WEBSITE_URL"
+          fi
 
       - name: Output Stack Information
         if: inputs.action != 'destroy'
@@ -187,9 +201,19 @@ jobs:
           echo "- **Deployed by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           
-          echo "## Stack Outputs & Repository Variables" >> $GITHUB_STEP_SUMMARY
-          echo "| Variable | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| S3_BUCKET_NAME_${{ needs.determine-environment.outputs.environment == 'prod' && 'PROD' || 'DEV' }} | $S3_BUCKET_NAME |" >> $GITHUB_STEP_SUMMARY
-          echo "| CLOUDFRONT_DISTRIBUTION_ID_${{ needs.determine-environment.outputs.environment == 'prod' && 'PROD' || 'DEV' }} | $CLOUDFRONT_DISTRIBUTION_ID |" >> $GITHUB_STEP_SUMMARY
-          echo "| WEBSITE_URL_${{ needs.determine-environment.outputs.environment == 'prod' && 'PROD' || 'DEV' }} | $WEBSITE_URL |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Repository Variables Required" >> $GITHUB_STEP_SUMMARY
+          echo "The following repository variables are needed for deployment workflows:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Variable Name | Value | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------------|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| \`S3_BUCKET_NAME_${{ needs.determine-environment.outputs.environment == 'prod' && 'PROD' || 'DEV' }}\` | \`$S3_BUCKET_NAME\` | 🔧 Check logs above |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`CLOUDFRONT_DISTRIBUTION_ID_${{ needs.determine-environment.outputs.environment == 'prod' && 'PROD' || 'DEV' }}\` | \`$CLOUDFRONT_DISTRIBUTION_ID\` | 🔧 Check logs above |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`WEBSITE_URL_${{ needs.determine-environment.outputs.environment == 'prod' && 'PROD' || 'DEV' }}\` | \`$WEBSITE_URL\` | 🔧 Check logs above |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Manual Setup Instructions (if automatic setup failed)" >> $GITHUB_STEP_SUMMARY
+          echo "1. Go to **Settings** → **Secrets and variables** → **Actions**" >> $GITHUB_STEP_SUMMARY
+          echo "2. Click on the **Variables** tab" >> $GITHUB_STEP_SUMMARY
+          echo "3. Add the variables listed above with their corresponding values" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> 💡 **Note**: Repository variables are required for the deployment workflows to function correctly." >> $GITHUB_STEP_SUMMARY
