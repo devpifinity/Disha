@@ -70,6 +70,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      actions: write
 
     steps:
       - name: Checkout code
@@ -128,9 +129,56 @@ jobs:
         run: |
           npx cdk destroy --force -c environment=${{ needs.determine-environment.outputs.environment }}
 
-      - name: Output Stack Information
+      - name: Extract Stack Outputs
         if: inputs.action != 'destroy'
         working-directory: infrastructure/cdk
+        run: |
+          # Extract stack outputs and set as environment variables
+          STACK_NAME="disha-career-platform-${{ needs.determine-environment.outputs.environment }}"
+          ENV="${{ needs.determine-environment.outputs.environment }}"
+          
+          # Get stack outputs in JSON format
+          OUTPUTS=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs' \
+            --output json)
+          
+          # Extract individual values
+          S3_BUCKET=$(echo $OUTPUTS | jq -r '.[] | select(.OutputKey=="S3BucketName") | .OutputValue')
+          CLOUDFRONT_ID=$(echo $OUTPUTS | jq -r '.[] | select(.OutputKey=="CloudFrontDistributionId") | .OutputValue')
+          WEBSITE_URL=$(echo $OUTPUTS | jq -r '.[] | select(.OutputKey=="WebsiteUrl") | .OutputValue')
+          
+          # Set environment variables for next step
+          echo "S3_BUCKET_NAME=$S3_BUCKET" >> $GITHUB_ENV
+          echo "CLOUDFRONT_DISTRIBUTION_ID=$CLOUDFRONT_ID" >> $GITHUB_ENV
+          echo "WEBSITE_URL=$WEBSITE_URL" >> $GITHUB_ENV
+          echo "ENVIRONMENT=$ENV" >> $GITHUB_ENV
+
+      - name: Set GitHub Repository Variables
+        if: inputs.action != 'destroy'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Set environment-specific variable names
+          ENV_SUFFIX=""
+          if [ "$ENVIRONMENT" = "dev" ]; then
+            ENV_SUFFIX="_DEV"
+          elif [ "$ENVIRONMENT" = "prod" ]; then
+            ENV_SUFFIX="_PROD"
+          fi
+          
+          # Set repository variables using GitHub CLI
+          gh variable set "S3_BUCKET_NAME${ENV_SUFFIX}" --body "$S3_BUCKET_NAME"
+          gh variable set "CLOUDFRONT_DISTRIBUTION_ID${ENV_SUFFIX}" --body "$CLOUDFRONT_DISTRIBUTION_ID"
+          gh variable set "WEBSITE_URL${ENV_SUFFIX}" --body "$WEBSITE_URL"
+          
+          echo "✅ Repository variables set successfully:"
+          echo "- S3_BUCKET_NAME${ENV_SUFFIX}: $S3_BUCKET_NAME"
+          echo "- CLOUDFRONT_DISTRIBUTION_ID${ENV_SUFFIX}: $CLOUDFRONT_DISTRIBUTION_ID"
+          echo "- WEBSITE_URL${ENV_SUFFIX}: $WEBSITE_URL"
+
+      - name: Output Stack Information
+        if: inputs.action != 'destroy'
         run: |
           echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "- **Environment**: ${{ needs.determine-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
@@ -139,9 +187,9 @@ jobs:
           echo "- **Deployed by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           
-          # Get stack outputs if available
-          echo "## Stack Outputs" >> $GITHUB_STEP_SUMMARY
-          aws cloudformation describe-stacks \
-            --stack-name disha-career-platform-${{ needs.determine-environment.outputs.environment }} \
-            --query 'Stacks[0].Outputs[*].[OutputKey,OutputValue]' \
-            --output table >> $GITHUB_STEP_SUMMARY || echo "No stack outputs available" >> $GITHUB_STEP_SUMMARY
+          echo "## Stack Outputs & Repository Variables" >> $GITHUB_STEP_SUMMARY
+          echo "| Variable | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| S3_BUCKET_NAME_${{ needs.determine-environment.outputs.environment == 'prod' && 'PROD' || 'DEV' }} | $S3_BUCKET_NAME |" >> $GITHUB_STEP_SUMMARY
+          echo "| CLOUDFRONT_DISTRIBUTION_ID_${{ needs.determine-environment.outputs.environment == 'prod' && 'PROD' || 'DEV' }} | $CLOUDFRONT_DISTRIBUTION_ID |" >> $GITHUB_STEP_SUMMARY
+          echo "| WEBSITE_URL_${{ needs.determine-environment.outputs.environment == 'prod' && 'PROD' || 'DEV' }} | $WEBSITE_URL |" >> $GITHUB_STEP_SUMMARY
