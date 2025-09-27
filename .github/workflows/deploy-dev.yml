@@ -110,28 +110,118 @@ jobs:
 
       - name: Deploy to S3
         run: |
+          echo "📦 Starting S3 deployment..."
+          
+          # Sync all files except index.html with long cache
           aws s3 sync dist/ s3://$S3_BUCKET_NAME \
             --delete \
             --cache-control "public,max-age=31536000,immutable" \
             --exclude "index.html" \
             --exclude "*.map"
           
-          # Upload index.html with shorter cache for SPA routing
+          # Upload index.html with shorter cache for SPA routing (dev: 5 min cache)
           aws s3 cp dist/index.html s3://$S3_BUCKET_NAME/index.html \
             --cache-control "public,max-age=300"
+          
+          echo "✅ S3 deployment completed"
+
+      - name: Verify S3 Deployment
+        run: |
+          echo "🔍 Verifying files were deployed correctly..."
+          
+          # Check if index.html exists and is accessible
+          if aws s3api head-object --bucket $S3_BUCKET_NAME --key index.html >/dev/null 2>&1; then
+            echo "✅ index.html found in S3"
+            
+            # Get file size to verify it's not empty
+            SIZE=$(aws s3api head-object --bucket $S3_BUCKET_NAME --key index.html --query ContentLength --output text)
+            echo "📄 index.html size: $SIZE bytes"
+            
+            if [ "$SIZE" -gt 100 ]; then
+              echo "✅ index.html appears to be valid (size > 100 bytes)"
+            else
+              echo "⚠️  index.html might be empty or corrupted"
+            fi
+          else
+            echo "❌ index.html not found in S3 bucket"
+            exit 1
+          fi
+          
+          # List all files in bucket for debugging
+          echo ""
+          echo "📋 Files in S3 bucket:"
+          aws s3 ls s3://$S3_BUCKET_NAME --recursive --human-readable
+          
+          # Wait a moment for S3 consistency
+          echo ""
+          echo "⏳ Waiting 10 seconds for S3 consistency..."
+          sleep 10
 
       - name: Invalidate CloudFront cache
         run: |
-          aws cloudfront create-invalidation \
+          echo "🔄 Creating CloudFront cache invalidation..."
+          
+          INVALIDATION_ID=$(aws cloudfront create-invalidation \
             --distribution-id $CLOUDFRONT_DISTRIBUTION_ID \
-            --paths "/*"
+            --paths "/*" \
+            --query 'Invalidation.Id' \
+            --output text)
+          
+          echo "✅ Cache invalidation created: $INVALIDATION_ID"
+          echo "🕐 Invalidation typically takes 1-5 minutes to complete"
+          
+          # Wait a moment for invalidation to start
+          sleep 5
+          
+          # Check invalidation status
+          STATUS=$(aws cloudfront get-invalidation \
+            --distribution-id $CLOUDFRONT_DISTRIBUTION_ID \
+            --id $INVALIDATION_ID \
+            --query 'Invalidation.Status' \
+            --output text)
+          
+          echo "📊 Invalidation status: $STATUS"
+
+      - name: Test Website Accessibility
+        run: |
+          echo "🌐 Testing website accessibility..."
+          
+          # Wait a bit more for CloudFront to process
+          echo "⏳ Waiting 30 seconds for CloudFront to update..."
+          sleep 30
+          
+          # Test the website URL
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $WEBSITE_URL || echo "000")
+          echo "🔍 Website HTTP status: $HTTP_STATUS"
+          
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "✅ Website is accessible!"
+          elif [ "$HTTP_STATUS" = "403" ]; then
+            echo "⚠️  Website returning 403 Forbidden"
+            echo "🔧 This might be due to:"
+            echo "   - CloudFront cache not yet updated"
+            echo "   - S3 permissions issue"
+            echo "   - OAI configuration problem"
+            echo ""
+            echo "🕐 Try accessing the website in 2-3 minutes"
+          else
+            echo "⚠️  Unexpected HTTP status: $HTTP_STATUS"
+          fi
+          
+          echo ""
+          echo "🌐 Website URL: $WEBSITE_URL"
 
       - name: Deployment summary
         run: |
-          echo "🚀 Deployment completed successfully!"
+          echo "🚀 Development deployment completed successfully!"
           echo "📍 Environment: Development"
           echo "🌐 URL: $WEBSITE_URL"
           echo "📦 Bucket: $S3_BUCKET_NAME"
           echo "🔄 Distribution: $CLOUDFRONT_DISTRIBUTION_ID"
           echo "📝 Commit: ${{ github.sha }}"
           echo "👤 Deployed by: ${{ github.actor }}"
+          echo ""
+          echo "📋 Next Steps:"
+          echo "1. Wait 2-3 minutes for CloudFront propagation"
+          echo "2. Visit the website URL above"
+          echo "3. If you see 403 errors, check the logs above for debugging info"
