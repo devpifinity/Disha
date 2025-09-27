@@ -73,18 +73,7 @@ export class S3Website extends Construct {
       priceClass: props.environment === 'prod' 
         ? cloudfront.PriceClass.PRICE_CLASS_ALL 
         : cloudfront.PriceClass.PRICE_CLASS_100,
-      enableLogging: props.enableLogging || false,
-      logBucket: props.enableLogging ? new s3.Bucket(this, 'LogsBucket', {
-        bucketName: `${props.bucketName}-logs`,
-        removalPolicy: cdk.RemovalPolicy.DESTROY,
-        lifecycleRules: [
-          {
-            id: 'DeleteLogs',
-            enabled: true,
-            expiration: cdk.Duration.days(90),
-          }
-        ],
-      }) : undefined,
+      enableLogging: false, // Disabled to avoid ACL complexity
     });
 
     // Grant CloudFront access to the bucket via OAI
