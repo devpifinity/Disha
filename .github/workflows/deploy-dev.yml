@@ -57,30 +57,81 @@ jobs:
           role-session-name: GitHubActions-Deploy-Dev
           aws-region: us-east-1
 
+      - name: Get Infrastructure Outputs
+        run: |
+          echo "🔍 Querying infrastructure stack outputs..."
+          
+          STACK_NAME="disha-career-platform-dev"
+          
+          # Query stack outputs directly from CloudFormation
+          S3_BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`S3BucketName`].OutputValue' \
+            --output text 2>/dev/null || echo "")
+          
+          CLOUDFRONT_ID=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDistributionId`].OutputValue' \
+            --output text 2>/dev/null || echo "")
+          
+          WEBSITE_URL=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`WebsiteUrl`].OutputValue' \
+            --output text 2>/dev/null || echo "")
+          
+          # Validate outputs exist
+          if [ -z "$S3_BUCKET" ] || [ "$S3_BUCKET" = "None" ]; then
+            echo "❌ S3 bucket name not found in stack outputs"
+            echo "💡 Make sure infrastructure is deployed first"
+            exit 1
+          fi
+          
+          if [ -z "$CLOUDFRONT_ID" ] || [ "$CLOUDFRONT_ID" = "None" ]; then
+            echo "❌ CloudFront distribution ID not found in stack outputs"
+            echo "💡 Make sure infrastructure is deployed first"
+            exit 1
+          fi
+          
+          if [ -z "$WEBSITE_URL" ] || [ "$WEBSITE_URL" = "None" ]; then
+            echo "❌ Website URL not found in stack outputs"
+            echo "💡 Make sure infrastructure is deployed first"
+            exit 1
+          fi
+          
+          echo "✅ Retrieved from stack: $STACK_NAME"
+          echo "✅ S3 bucket: $S3_BUCKET"
+          echo "✅ CloudFront distribution: $CLOUDFRONT_ID"
+          echo "✅ Website URL: $WEBSITE_URL"
+          
+          # Set as environment variables for subsequent steps
+          echo "S3_BUCKET_NAME=$S3_BUCKET" >> $GITHUB_ENV
+          echo "CLOUDFRONT_DISTRIBUTION_ID=$CLOUDFRONT_ID" >> $GITHUB_ENV
+          echo "WEBSITE_URL=$WEBSITE_URL" >> $GITHUB_ENV
+
       - name: Deploy to S3
         run: |
-          aws s3 sync dist/ s3://${{ vars.S3_BUCKET_NAME_DEV }} \
+          aws s3 sync dist/ s3://$S3_BUCKET_NAME \
             --delete \
             --cache-control "public,max-age=31536000,immutable" \
             --exclude "index.html" \
             --exclude "*.map"
           
           # Upload index.html with shorter cache for SPA routing
-          aws s3 cp dist/index.html s3://${{ vars.S3_BUCKET_NAME_DEV }}/index.html \
+          aws s3 cp dist/index.html s3://$S3_BUCKET_NAME/index.html \
             --cache-control "public,max-age=300"
 
       - name: Invalidate CloudFront cache
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID_DEV }} \
+            --distribution-id $CLOUDFRONT_DISTRIBUTION_ID \
             --paths "/*"
 
       - name: Deployment summary
         run: |
           echo "🚀 Deployment completed successfully!"
           echo "📍 Environment: Development"
-          echo "🌐 URL: ${{ vars.WEBSITE_URL_DEV }}"
-          echo "📦 Bucket: ${{ vars.S3_BUCKET_NAME_DEV }}"
-          echo "🔄 Distribution: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID_DEV }}"
+          echo "🌐 URL: $WEBSITE_URL"
+          echo "📦 Bucket: $S3_BUCKET_NAME"
+          echo "🔄 Distribution: $CLOUDFRONT_DISTRIBUTION_ID"
           echo "📝 Commit: ${{ github.sha }}"
           echo "👤 Deployed by: ${{ github.actor }}"
