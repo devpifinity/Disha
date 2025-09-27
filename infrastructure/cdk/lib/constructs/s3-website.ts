@@ -3,7 +3,6 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
-import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 
 export interface S3WebsiteProps {
@@ -40,19 +39,16 @@ export class S3Website extends Construct {
       ] : undefined,
     });
 
-    // Create Origin Access Control for CloudFront
-    const originAccessControl = new cloudfront.OriginAccessControl(this, 'OAC', {
-      description: `OAC for ${props.bucketName}`,
-      originAccessControlOriginType: cloudfront.OriginAccessControlOriginType.S3,
-      signing: cloudfront.Signing.SIGV4_ALWAYS,
+    // Create CloudFront distribution with Origin Access Identity (simpler approach)
+    const originAccessIdentity = new cloudfront.OriginAccessIdentity(this, 'OAI', {
+      comment: `OAI for ${props.bucketName}`,
     });
 
-    // Create CloudFront distribution
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
       comment: `Disha Career Platform - ${props.environment}`,
       defaultBehavior: {
-        origin: origins.S3BucketOrigin.withOriginAccessControl(this.bucket, {
-          originAccessControl,
+        origin: new origins.S3Origin(this.bucket, {
+          originAccessIdentity,
         }),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
@@ -91,19 +87,8 @@ export class S3Website extends Construct {
       }) : undefined,
     });
 
-    // Add bucket policy to allow CloudFront access
-    this.bucket.addToResourcePolicy(new iam.PolicyStatement({
-      sid: 'AllowCloudFrontServicePrincipal',
-      effect: iam.Effect.ALLOW,
-      principals: [new iam.ServicePrincipal('cloudfront.amazonaws.com')],
-      actions: ['s3:GetObject'],
-      resources: [this.bucket.arnForObjects('*')],
-      conditions: {
-        StringEquals: {
-          'AWS:SourceArn': `arn:aws:cloudfront::${cdk.Stack.of(this).account}:distribution/${this.distribution.distributionId}`,
-        },
-      },
-    }));
+    // Grant CloudFront access to the bucket via OAI
+    this.bucket.grantRead(originAccessIdentity);
 
     this.distributionUrl = `https://${this.distribution.distributionDomainName}`;
 
