@@ -36,13 +36,14 @@ jobs:
 
     permissions:
       id-token: write
-      contents: read
+      contents: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.branch || 'main' }}
+          token: ${{ github.token }}
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -132,8 +133,22 @@ jobs:
           git config --local user.name "GitHub Action"
           
           TAG_NAME="deploy-prod-$(date +'%Y%m%d-%H%M%S')"
-          git tag $TAG_NAME
-          git push origin $TAG_NAME
+          
+          # Try to create and push tag, but don't fail if it doesn't work
+          if git tag $TAG_NAME 2>/dev/null; then
+            echo "✅ Created tag: $TAG_NAME"
+            if git push origin $TAG_NAME 2>/dev/null; then
+              echo "✅ Pushed tag: $TAG_NAME"
+            else
+              echo "⚠️  Failed to push tag (insufficient permissions)"
+              echo "📋 Tag created locally: $TAG_NAME"
+            fi
+          else
+            echo "⚠️  Failed to create tag"
+          fi
+          
+          # Set tag name for deployment summary
+          echo "DEPLOYMENT_TAG=$TAG_NAME" >> $GITHUB_ENV
 
       - name: Deployment summary
         run: |
@@ -144,7 +159,7 @@ jobs:
           echo "🔄 Distribution: $CLOUDFRONT_DISTRIBUTION_ID"
           echo "📝 Commit: ${{ github.sha }}"
           echo "👤 Deployed by: ${{ github.actor }}"
-          echo "🏷️  Tagged as: deploy-prod-$(date +'%Y%m%d-%H%M%S')"
+          echo "🏷️  Tag: $DEPLOYMENT_TAG"
 
       - name: Notify deployment
         if: always()
