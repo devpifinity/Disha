@@ -4,6 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { BookOpen, Compass, Target, Users } from "lucide-react";
 
+
+
+
+
 const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-hero-bg relative overflow-hidden">

@@ -1,15 +1,36 @@
-
-import { useState } from "react";
+import { useState , useEffect} from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Search, ArrowLeft, Target, TrendingUp } from "lucide-react";
+import { supabase } from "@/integrations/supabase";
+import type { CareerPath, College, Course, Exam } from "@/integrations/supabase";
+import { useQuery } from '@tanstack/react-query';
 
 const CareerSearch = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
+ const [careerPathData, setCareerPathData] = useState([]);
+
+
+  
+
+    const fetchCareerData = useQuery({
+    queryKey: ['career-path'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+
+        .from('career_path')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      setCareerPathData(data)
+    },
+  });
+  
+
 
   // Popular career options with their slugs
   const popularCareers = [
@@ -40,7 +61,7 @@ const CareerSearch = () => {
   ];
 
   // Filter careers based on search term
-  const filteredCareers = popularCareers.filter(career =>
+  const filteredCareers = careerPathData.filter(career =>
     career.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
