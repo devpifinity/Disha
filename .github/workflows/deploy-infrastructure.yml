@@ -25,6 +25,11 @@ on:
           - deploy
           - diff
           - destroy
+      branch:
+        description: 'Branch to deploy from'
+        required: false
+        default: 'main'
+        type: string
 
 concurrency:
   group: deploy-infrastructure-${{ github.ref_name }}-${{ inputs.environment || (github.ref_name == 'main' && 'prod' || 'dev') }}
@@ -65,28 +70,29 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      actions: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: infrastructure/cdk/package-lock.json
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ needs.determine-environment.outputs.environment == 'prod' && vars.AWS_ROLE_ARN_PROD || vars.AWS_ROLE_ARN_DEV }}
+          role-to-assume: arn:aws:iam::418295724706:role/GitHub-OIDC
           role-session-name: GitHubActions-CDK-${{ needs.determine-environment.outputs.environment }}
           aws-region: us-east-1
 
       - name: Install CDK dependencies
         working-directory: infrastructure/cdk
-        run: npm ci
+        run: npm install
 
       - name: Build CDK
         working-directory: infrastructure/cdk
@@ -123,20 +129,107 @@ jobs:
         run: |
           npx cdk destroy --force -c environment=${{ needs.determine-environment.outputs.environment }}
 
-      - name: Output Stack Information
+      - name: Extract Stack Outputs
         if: inputs.action != 'destroy'
         working-directory: infrastructure/cdk
         run: |
-          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          # Extract stack outputs and set as environment variables
+          STACK_NAME="disha-career-platform-${{ needs.determine-environment.outputs.environment }}"
+          ENV="${{ needs.determine-environment.outputs.environment }}"
+          
+          # Get stack outputs in JSON format
+          OUTPUTS=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs' \
+            --output json)
+          
+          # Extract individual values
+          S3_BUCKET=$(echo $OUTPUTS | jq -r '.[] | select(.OutputKey=="S3BucketName") | .OutputValue')
+          CLOUDFRONT_ID=$(echo $OUTPUTS | jq -r '.[] | select(.OutputKey=="CloudFrontDistributionId") | .OutputValue')
+          WEBSITE_URL=$(echo $OUTPUTS | jq -r '.[] | select(.OutputKey=="WebsiteUrl") | .OutputValue')
+          
+          # Set environment variables for next step
+          echo "S3_BUCKET_NAME=$S3_BUCKET" >> $GITHUB_ENV
+          echo "CLOUDFRONT_DISTRIBUTION_ID=$CLOUDFRONT_ID" >> $GITHUB_ENV
+          echo "WEBSITE_URL=$WEBSITE_URL" >> $GITHUB_ENV
+          echo "ENVIRONMENT=$ENV" >> $GITHUB_ENV
+
+      - name: Validate Stack Outputs
+        if: inputs.action != 'destroy'
+        run: |
+          echo "🔍 Validating stack outputs are properly configured..."
+          
+          STACK_NAME="disha-career-platform-$ENVIRONMENT"
+          
+          # Validate that all required outputs exist
+          echo "📋 Checking stack outputs for: $STACK_NAME"
+          
+          S3_BUCKET_CHECK=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`S3BucketName`].OutputValue' \
+            --output text 2>/dev/null || echo "")
+          
+          CLOUDFRONT_ID_CHECK=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDistributionId`].OutputValue' \
+            --output text 2>/dev/null || echo "")
+          
+          WEBSITE_URL_CHECK=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`WebsiteUrl`].OutputValue' \
+            --output text 2>/dev/null || echo "")
+          
+          # Validate outputs
+          if [ -n "$S3_BUCKET_CHECK" ]; then
+            echo "✅ S3BucketName output: $S3_BUCKET_CHECK"
+          else
+            echo "❌ S3BucketName output missing or empty"
+            exit 1
+          fi
+          
+          if [ -n "$CLOUDFRONT_ID_CHECK" ]; then
+            echo "✅ CloudFrontDistributionId output: $CLOUDFRONT_ID_CHECK"
+          else
+            echo "❌ CloudFrontDistributionId output missing or empty"
+            exit 1
+          fi
+          
+          if [ -n "$WEBSITE_URL_CHECK" ]; then
+            echo "✅ WebsiteUrl output: $WEBSITE_URL_CHECK"
+          else
+            echo "❌ WebsiteUrl output missing or empty"
+            exit 1
+          fi
+          
+          echo ""
+          echo "🎉 All stack outputs are properly configured!"
+          echo "✅ Deployment workflows can now query these outputs directly"
+
+      - name: Output Stack Information
+        if: inputs.action != 'destroy'
+        run: |
+          echo "## Infrastructure Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "- **Environment**: ${{ needs.determine-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Stack Name**: disha-career-platform-${{ needs.determine-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Region**: us-east-1" >> $GITHUB_STEP_SUMMARY
           echo "- **Deployed by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           
-          # Get stack outputs if available
-          echo "## Stack Outputs" >> $GITHUB_STEP_SUMMARY
-          aws cloudformation describe-stacks \
-            --stack-name disha-career-platform-${{ needs.determine-environment.outputs.environment }} \
-            --query 'Stacks[0].Outputs[*].[OutputKey,OutputValue]' \
-            --output table >> $GITHUB_STEP_SUMMARY || echo "No stack outputs available" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Stack Outputs Configured" >> $GITHUB_STEP_SUMMARY
+          echo "Deployment workflows will query these outputs directly from CloudFormation:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Output Key | Value | Usage |" >> $GITHUB_STEP_SUMMARY
+          echo "|------------|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| \`S3BucketName\` | \`$S3_BUCKET_NAME\` | S3 deployment target |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`CloudFrontDistributionId\` | \`$CLOUDFRONT_DISTRIBUTION_ID\` | Cache invalidation |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`WebsiteUrl\` | \`$WEBSITE_URL\` | Deployed website URL |" >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Ready for Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Deployment workflows can now be executed" >> $GITHUB_STEP_SUMMARY
+          echo "✅ No manual configuration required" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Stack outputs will be queried automatically" >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> 💡 **How it works**: Deployment workflows will use \`aws cloudformation describe-stacks\` to get current values directly from the infrastructure stack."

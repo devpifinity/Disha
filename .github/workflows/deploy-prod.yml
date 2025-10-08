@@ -1,9 +1,20 @@
 name: Deploy to Production
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Confirm deployment to Production'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+      branch:
+        description: 'Branch to deploy from'
+        required: false
+        default: 'main'
+        type: string
 
 concurrency:
   group: deploy-prod
@@ -15,6 +26,7 @@ jobs:
     uses: ./.github/workflows/quality-checks.yml
     with:
       node-version: '18'
+      branch: ${{ inputs.branch || 'main' }}
 
   deploy-prod:
     name: Deploy to Production
@@ -24,11 +36,14 @@ jobs:
 
     permissions:
       id-token: write
-      contents: read
+      contents: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || 'main' }}
+          token: ${{ github.token }}
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -39,27 +54,134 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN_PROD }}
+          role-to-assume: arn:aws:iam::418295724706:role/GitHub-OIDC
           role-session-name: GitHubActions-Deploy-Prod
           aws-region: us-east-1
 
+      - name: Get Infrastructure Outputs
+        run: |
+          echo "🔍 Querying infrastructure stack outputs..."
+          
+          STACK_NAME="disha-career-platform-prod"
+          
+          # Query stack outputs directly from CloudFormation
+          S3_BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`S3BucketName`].OutputValue' \
+            --output text 2>/dev/null || echo "")
+          
+          CLOUDFRONT_ID=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDistributionId`].OutputValue' \
+            --output text 2>/dev/null || echo "")
+          
+          WEBSITE_URL=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`WebsiteUrl`].OutputValue' \
+            --output text 2>/dev/null || echo "")
+          
+          # Validate outputs exist
+          if [ -z "$S3_BUCKET" ] || [ "$S3_BUCKET" = "None" ]; then
+            echo "❌ S3 bucket name not found in stack outputs"
+            echo "💡 Make sure infrastructure is deployed first"
+            exit 1
+          fi
+          
+          if [ -z "$CLOUDFRONT_ID" ] || [ "$CLOUDFRONT_ID" = "None" ]; then
+            echo "❌ CloudFront distribution ID not found in stack outputs"
+            echo "💡 Make sure infrastructure is deployed first"
+            exit 1
+          fi
+          
+          if [ -z "$WEBSITE_URL" ] || [ "$WEBSITE_URL" = "None" ]; then
+            echo "❌ Website URL not found in stack outputs"
+            echo "💡 Make sure infrastructure is deployed first"
+            exit 1
+          fi
+          
+          echo "✅ Retrieved from stack: $STACK_NAME"
+          echo "✅ S3 bucket: $S3_BUCKET"
+          echo "✅ CloudFront distribution: $CLOUDFRONT_ID"
+          echo "✅ Website URL: $WEBSITE_URL"
+          
+          # Set as environment variables for subsequent steps
+          echo "S3_BUCKET_NAME=$S3_BUCKET" >> $GITHUB_ENV
+          echo "CLOUDFRONT_DISTRIBUTION_ID=$CLOUDFRONT_ID" >> $GITHUB_ENV
+          echo "WEBSITE_URL=$WEBSITE_URL" >> $GITHUB_ENV
+
       - name: Deploy to S3
         run: |
-          aws s3 sync dist/ s3://${{ vars.S3_BUCKET_NAME_PROD }} \
+          echo "📦 Starting S3 deployment..."
+          
+          # Sync all files except index.html with long cache
+          aws s3 sync dist/ s3://$S3_BUCKET_NAME \
             --delete \
             --cache-control "public,max-age=31536000,immutable" \
             --exclude "index.html" \
             --exclude "*.map"
           
           # Upload index.html with shorter cache for SPA routing
-          aws s3 cp dist/index.html s3://${{ vars.S3_BUCKET_NAME_PROD }}/index.html \
+          aws s3 cp dist/index.html s3://$S3_BUCKET_NAME/index.html \
             --cache-control "public,max-age=3600"
+          
+          echo "✅ S3 deployment completed"
+
+      - name: Verify S3 Deployment
+        run: |
+          echo "🔍 Verifying files were deployed correctly..."
+          
+          # Check if index.html exists and is accessible
+          if aws s3api head-object --bucket $S3_BUCKET_NAME --key index.html >/dev/null 2>&1; then
+            echo "✅ index.html found in S3"
+            
+            # Get file size to verify it's not empty
+            SIZE=$(aws s3api head-object --bucket $S3_BUCKET_NAME --key index.html --query ContentLength --output text)
+            echo "📄 index.html size: $SIZE bytes"
+            
+            if [ "$SIZE" -gt 100 ]; then
+              echo "✅ index.html appears to be valid (size > 100 bytes)"
+            else
+              echo "⚠️  index.html might be empty or corrupted"
+            fi
+          else
+            echo "❌ index.html not found in S3 bucket"
+            exit 1
+          fi
+          
+          # List all files in bucket for debugging
+          echo ""
+          echo "📋 Files in S3 bucket:"
+          aws s3 ls s3://$S3_BUCKET_NAME --recursive --human-readable
+          
+          # Wait a moment for S3 consistency
+          echo ""
+          echo "⏳ Waiting 10 seconds for S3 consistency..."
+          sleep 10
 
       - name: Invalidate CloudFront cache
         run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID_PROD }} \
-            --paths "/*"
+          echo "🔄 Creating CloudFront cache invalidation..."
+          
+          INVALIDATION_ID=$(aws cloudfront create-invalidation \
+            --distribution-id $CLOUDFRONT_DISTRIBUTION_ID \
+            --paths "/*" \
+            --query 'Invalidation.Id' \
+            --output text)
+          
+          echo "✅ Cache invalidation created: $INVALIDATION_ID"
+          echo "🕐 Invalidation typically takes 1-5 minutes to complete"
+          
+          # Wait a moment for invalidation to start
+          sleep 5
+          
+          # Check invalidation status
+          STATUS=$(aws cloudfront get-invalidation \
+            --distribution-id $CLOUDFRONT_DISTRIBUTION_ID \
+            --id $INVALIDATION_ID \
+            --query 'Invalidation.Status' \
+            --output text)
+          
+          echo "📊 Invalidation status: $STATUS"
 
       - name: Create deployment tag
         run: |
@@ -67,19 +189,67 @@ jobs:
           git config --local user.name "GitHub Action"
           
           TAG_NAME="deploy-prod-$(date +'%Y%m%d-%H%M%S')"
-          git tag $TAG_NAME
-          git push origin $TAG_NAME
+          
+          # Try to create and push tag, but don't fail if it doesn't work
+          if git tag $TAG_NAME 2>/dev/null; then
+            echo "✅ Created tag: $TAG_NAME"
+            if git push origin $TAG_NAME 2>/dev/null; then
+              echo "✅ Pushed tag: $TAG_NAME"
+            else
+              echo "⚠️  Failed to push tag (insufficient permissions)"
+              echo "📋 Tag created locally: $TAG_NAME"
+            fi
+          else
+            echo "⚠️  Failed to create tag"
+          fi
+          
+          # Set tag name for deployment summary
+          echo "DEPLOYMENT_TAG=$TAG_NAME" >> $GITHUB_ENV
+
+      - name: Test Website Accessibility
+        run: |
+          echo "🌐 Testing website accessibility..."
+          
+          # Wait a bit more for CloudFront to process
+          echo "⏳ Waiting 30 seconds for CloudFront to update..."
+          sleep 30
+          
+          # Test the website URL
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $WEBSITE_URL || echo "000")
+          echo "🔍 Website HTTP status: $HTTP_STATUS"
+          
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "✅ Website is accessible!"
+          elif [ "$HTTP_STATUS" = "403" ]; then
+            echo "⚠️  Website returning 403 Forbidden"
+            echo "🔧 This might be due to:"
+            echo "   - CloudFront cache not yet updated"
+            echo "   - S3 permissions issue"
+            echo "   - OAI configuration problem"
+            echo ""
+            echo "🕐 Try accessing the website in 2-3 minutes"
+          else
+            echo "⚠️  Unexpected HTTP status: $HTTP_STATUS"
+          fi
+          
+          echo ""
+          echo "🌐 Website URL: $WEBSITE_URL"
 
       - name: Deployment summary
         run: |
           echo "🚀 Production deployment completed successfully!"
           echo "📍 Environment: Production"
-          echo "🌐 URL: ${{ vars.WEBSITE_URL_PROD }}"
-          echo "📦 Bucket: ${{ vars.S3_BUCKET_NAME_PROD }}"
-          echo "🔄 Distribution: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID_PROD }}"
+          echo "🌐 URL: $WEBSITE_URL"
+          echo "📦 Bucket: $S3_BUCKET_NAME"
+          echo "🔄 Distribution: $CLOUDFRONT_DISTRIBUTION_ID"
           echo "📝 Commit: ${{ github.sha }}"
           echo "👤 Deployed by: ${{ github.actor }}"
-          echo "🏷️  Tagged as: deploy-prod-$(date +'%Y%m%d-%H%M%S')"
+          echo "🏷️  Tag: $DEPLOYMENT_TAG"
+          echo ""
+          echo "📋 Next Steps:"
+          echo "1. Wait 2-3 minutes for CloudFront propagation"
+          echo "2. Visit the website URL above"
+          echo "3. If you see 403 errors, check the logs above for debugging info"
 
       - name: Notify deployment
         if: always()

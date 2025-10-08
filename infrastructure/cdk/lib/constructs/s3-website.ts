@@ -3,7 +3,6 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
-import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 
 export interface S3WebsiteProps {
@@ -22,12 +21,11 @@ export class S3Website extends Construct {
   constructor(scope: Construct, id: string, props: S3WebsiteProps) {
     super(scope, id);
 
-    // Create S3 bucket for website content
+    // Create S3 bucket for website content (using OAI, not website hosting)
     this.bucket = new s3.Bucket(this, 'WebsiteBucket', {
       bucketName: props.bucketName,
-      websiteIndexDocument: props.indexDocument || 'index.html',
-      websiteErrorDocument: props.errorDocument || 'index.html', // SPA routing
-      publicReadAccess: false, // CloudFront will handle access
+      // Removed websiteIndexDocument and websiteErrorDocument to use OAI pattern
+      publicReadAccess: false, // CloudFront will handle access via OAI
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       removalPolicy: props.environment === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
       versioned: props.environment === 'prod',
@@ -40,19 +38,17 @@ export class S3Website extends Construct {
       ] : undefined,
     });
 
-    // Create Origin Access Control for CloudFront
-    const originAccessControl = new cloudfront.OriginAccessControl(this, 'OAC', {
-      description: `OAC for ${props.bucketName}`,
-      originAccessControlOriginType: cloudfront.OriginAccessControlOriginType.S3,
-      signing: cloudfront.Signing.SIGV4_ALWAYS,
+    // Create CloudFront distribution with Origin Access Identity (simpler approach)
+    const originAccessIdentity = new cloudfront.OriginAccessIdentity(this, 'OAI', {
+      comment: `OAI for ${props.bucketName}`,
     });
 
-    // Create CloudFront distribution
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
       comment: `Disha Career Platform - ${props.environment}`,
+      defaultRootObject: props.indexDocument || 'index.html',
       defaultBehavior: {
-        origin: origins.S3BucketOrigin.withOriginAccessControl(this.bucket, {
-          originAccessControl,
+        origin: new origins.S3Origin(this.bucket, {
+          originAccessIdentity,
         }),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
@@ -77,33 +73,11 @@ export class S3Website extends Construct {
       priceClass: props.environment === 'prod' 
         ? cloudfront.PriceClass.PRICE_CLASS_ALL 
         : cloudfront.PriceClass.PRICE_CLASS_100,
-      enableLogging: props.enableLogging || false,
-      logBucket: props.enableLogging ? new s3.Bucket(this, 'LogsBucket', {
-        bucketName: `${props.bucketName}-logs`,
-        removalPolicy: cdk.RemovalPolicy.DESTROY,
-        lifecycleRules: [
-          {
-            id: 'DeleteLogs',
-            enabled: true,
-            expiration: cdk.Duration.days(90),
-          }
-        ],
-      }) : undefined,
+      enableLogging: false, // Disabled to avoid ACL complexity
     });
 
-    // Add bucket policy to allow CloudFront access
-    this.bucket.addToResourcePolicy(new iam.PolicyStatement({
-      sid: 'AllowCloudFrontServicePrincipal',
-      effect: iam.Effect.ALLOW,
-      principals: [new iam.ServicePrincipal('cloudfront.amazonaws.com')],
-      actions: ['s3:GetObject'],
-      resources: [this.bucket.arnForObjects('*')],
-      conditions: {
-        StringEquals: {
-          'AWS:SourceArn': `arn:aws:cloudfront::${cdk.Stack.of(this).account}:distribution/${this.distribution.distributionId}`,
-        },
-      },
-    }));
+    // Grant CloudFront access to the bucket via OAI
+    this.bucket.grantRead(originAccessIdentity);
 
     this.distributionUrl = `https://${this.distribution.distributionDomainName}`;
 
