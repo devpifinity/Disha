@@ -45,32 +45,29 @@ with st.sidebar:
                                 help="Your Supabase anon/service role key")
     
     if supabase_url and supabase_key:
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Test Connection", use_container_width=True):
-                try:
-                    supabase = SupabaseIntegration(supabase_url, supabase_key)
-                    if supabase.test_connection():
-                        st.success("✅ Connected!")
-                    else:
-                        st.error("❌ Failed")
-                except Exception as e:
-                    st.error(f"❌ {str(e)[:50]}")
+        if st.button("Test Connection", use_container_width=True):
+            try:
+                supabase = SupabaseIntegration(supabase_url, supabase_key)
+                if supabase.test_connection():
+                    st.success("✅ Connected!")
+                else:
+                    st.error("❌ Failed")
+            except Exception as e:
+                st.error(f"❌ {str(e)[:50]}")
         
-        with col2:
-            if st.button("Staging Stats", use_container_width=True):
-                try:
-                    supabase = SupabaseIntegration(supabase_url, supabase_key)
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    stats = loop.run_until_complete(supabase.get_staging_stats())
-                    loop.close()
-                    
-                    if stats:
-                        st.info(f"Colleges: {stats.get('total_colleges', 0)}")
-                        st.info(f"Courses: {stats.get('total_courses', 0)}")
-                except Exception as e:
-                    st.error(f"❌ {str(e)[:50]}")
+        if st.button("Staging Stats", use_container_width=True):
+            try:
+                supabase = SupabaseIntegration(supabase_url, supabase_key)
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                stats = loop.run_until_complete(supabase.get_staging_stats())
+                loop.close()
+                
+                if stats:
+                    st.info(f"Colleges: {stats.get('total_colleges', 0)}")
+                    st.info(f"Courses: {stats.get('total_courses', 0)}")
+            except Exception as e:
+                st.error(f"❌ {str(e)[:50]}")
     
     st.markdown("---")
     

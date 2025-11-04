@@ -8,3 +8,4 @@ playwright>=1.40.0
 google-generativeai>=0.3.0
 supabase>=2.0.0
 json-repair>=0.3.2
+streamlit>=1.40.0
