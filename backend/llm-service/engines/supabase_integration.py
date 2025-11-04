@@ -2,7 +2,7 @@ import os
 from typing import List, Dict, Optional
 from supabase import create_client, Client
 from datetime import datetime
-from src.models.college import College, Course
+from models.college import College, Course
 
 class SupabaseIntegration:
     def __init__(self, url: str = None, key: str = None):

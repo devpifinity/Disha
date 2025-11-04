@@ -3,7 +3,7 @@ import json
 import re
 from typing import List, Dict, Optional
 from datetime import datetime
-from ..models.college import College, Course, VerificationStatus, EvidenceStatus
+from models.college import College, Course, VerificationStatus, EvidenceStatus
 import google.generativeai as genai
 from json_repair import repair_json
 

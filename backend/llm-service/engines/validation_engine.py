@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlparse, urljoin
 import time
 from typing import Dict, List, Optional
-from ..models.college import College, EvidenceStatus
+from models.college import College, EvidenceStatus
 
 class EvidenceValidator:
     def __init__(self, delay: float = 2.0):
