@@ -33,43 +33,26 @@ create table public.skill(
 create table public.entrance_exam(
   id uuid default gen_random_uuid() primary key,
   name text not null,
-  description text[] not null,
+  description text not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- Create an enum type for the “type” column
-CREATE TYPE public.type_of_college AS ENUM ('govt', 'private');
-
-CREATE DOMAIN public.url AS TEXT
-CHECK (
-  VALUE ~* '^https?://([a-z0-9]+([-.]{1}[a-z0-9]+)*\.[a-z]{2,5})(:[0-9]{1,5})?(/.*)?$'
-);
-
-CREATE DOMAIN public.phone AS VARCHAR(25)
-CHECK (
-  VALUE ~ '^\+\d{1,15}$'
-);
-
-CREATE EXTENSION citext;
-
-CREATE DOMAIN public.email_address AS citext
-CHECK (
-    VALUE ~ '^[a-zA-Z0-9.!#$%&''*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
-);
 -- Create colleges table
 --TODO scholarshipDetails should it be a different table
 create table public.college (
   id uuid default gen_random_uuid() primary key,
   name text not null,
-  description text[] not null,
-  location text not null,
+  description text not null,
   address text not null,
-  website public.url not null,
-  email public.email_address NOT NULL,
-  phone public.phone not null,
-  scholarshipDetails text[] not null,
+  city text not null,
+  state text not null,
+  zip_code text not null,
+  website text not null,
+  email text NOT NULL,
+  phone text not null,
+  scholarshipDetails text not null,
   rating numeric(2,1) not null,
-  type public.type_of_college not null,
+  type text not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -93,8 +76,11 @@ CREATE TABLE public.career_path (
 create table public.course (
   id uuid default gen_random_uuid() primary key,
   name text not null,
-  description text[] not null,
+  description text not null,
   duration text not null,
+  degree_level text,
+  seats numeric(2,1),
+  annual_fees text, 
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -136,7 +122,7 @@ CREATE TABLE public.careerpath_skills(
 -- Table for CareerJobOpportunities
 CREATE TABLE public.career_job_opportunity(
     id uuid default gen_random_uuid() primary key,
-    careerpath_id uuid NOT NULL,
+    careerpath_id uuid NULL,
     job_title TEXT NOT NULL,
     FOREIGN KEY (careerpath_id) REFERENCES public.career_path(id)
 );
@@ -153,7 +139,7 @@ CREATE TABLE public.course_skills(
 -- Table for college_course_jobs
 CREATE TABLE public.college_course_jobs(
     id uuid default gen_random_uuid() primary key,
-    job_id uuid NOT NULL,
+    job_id uuid NULL,
     college_id uuid NOT NULL,
 	course_id uuid NOT NULL,
     FOREIGN KEY (job_id) REFERENCES public.career_job_opportunity(id),
@@ -168,5 +154,65 @@ CREATE TABLE public.course_entrance_exams(
     entranceexam_id uuid NOT NULL,
     FOREIGN KEY (entranceexam_id) REFERENCES public.entrance_exam(id),
 	FOREIGN KEY (course_id) REFERENCES public.course(id)
+);
+
+
+create table public.st_college (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  description text not null,
+  address text not null,
+  city text not null,
+  state text not null,
+  zip_code text not null,
+  website text not null,
+  email text NOT NULL,
+  phone text not null,
+  scholarshipDetails text not null,
+  rating numeric(2,1) not null,
+  type text not null,
+  confidence numeric(2,1) not null ,
+  confidence_level text not null,
+  evidence_status text,
+  evidence_urls text, 
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create table public.st_course (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  description text not null,
+  duration text not null,
+  degree_level text,
+  seats numeric(2,1),
+  annual_fees text, 
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+		  
+CREATE TABLE public.st_college_course_jobs(
+    id uuid default gen_random_uuid() primary key,
+    job_id uuid NULL,
+    college_id uuid NOT NULL,
+	course_id uuid NOT NULL,
+    FOREIGN KEY (job_id) REFERENCES public.career_job_opportunity(id),
+	FOREIGN KEY (college_id) REFERENCES public.st_college(id),
+	FOREIGN KEY (course_id) REFERENCES public.st_course(id)
+);
+
+create table public.st_entrance_exam(
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  description text not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+
+CREATE TABLE public.st_course_entrance_exams(
+    id uuid default gen_random_uuid() primary key,
+    course_id uuid NOT NULL,
+    entranceexam_id uuid NOT NULL,
+    FOREIGN KEY (entranceexam_id) REFERENCES public.st_entrance_exam(id),
+	FOREIGN KEY (course_id) REFERENCES public.st_course(id)
 );
 

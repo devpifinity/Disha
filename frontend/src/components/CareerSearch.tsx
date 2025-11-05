@@ -22,9 +22,22 @@ const CareerSearch = () => {
     queryFn: async () => {
       const { data, error } = await supabase
 
-        .from('career_path')
-        .select('*')
-        .order('name');
+     .from("career_path")
+  .select(`
+    id,
+    name,
+    career_job_opportunity (
+      job_title,
+      college_course_jobs (
+          college(name),
+          course(name)
+        )
+      )
+    )
+  `);
+
+
+
       if (error) throw error;
       setCareerPathData(data)
     },
@@ -157,7 +170,7 @@ const CareerSearch = () => {
                   <div className="text-center">
                     <div className="text-3xl mb-3">{career.emoji}</div>
                     <h3 className="font-medium text-gray-800 group-hover:text-green-600 transition-colors">
-                      {career.name}
+                      {career.name} Jobs {career.career_job_opportunity.length}
                     </h3>
                   </div>
                 </div>
