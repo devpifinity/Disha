@@ -20,7 +20,7 @@ from src.config import (
     OUTPUT_DIR,
     CSV_FILENAME
 )
-from src.auth import create_driver, manual_login
+from src.auth import create_driver, login, manual_login
 from src.downloader import get_all_results, try_download_report, build_search_url
 from src.utils import save_data
 
@@ -31,13 +31,13 @@ def parse_arguments():
         description='College Data Downloader - Scrape college information with filters',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-        Examples:
-        python main.py Engineering Science Chandigarh Chitkara
-        python main.py Engineering null Delhi null --format both
-        python main.py null null Bangalore null --format json
-        
-        Note: Use 'null' for filters you want to skip
-                """
+Examples:
+  python main.py Engineering Science Chandigarh Chitkara
+  python main.py Engineering null Delhi null --format both
+  python main.py null null Bangalore null --format json
+  
+Note: Use 'null' for filters you want to skip
+        """
     )
     
     parser.add_argument('course_category', 
@@ -55,6 +55,9 @@ def parse_arguments():
     parser.add_argument('--headless', 
                         action='store_true',
                         help='Run browser in headless mode')
+    parser.add_argument('--manual-login',
+                        action='store_true',
+                        help='Use manual login instead of automatic')
     
     return parser.parse_args()
 
@@ -94,10 +97,18 @@ def main():
         headless_mode = HEADLESS or args.headless
         driver = create_driver(headless=headless_mode)
         
-        # Manual Login
-        print("\nStep 1: Opening login page for manual login...")
+        # Login
         import time
-        manual_login(driver, MAIN_URL)
+        if args.manual_login:
+            print("\nStep 1: Opening login page for manual login...")
+            manual_login(driver, MAIN_URL)
+        else:
+            print("\nStep 1: Attempting automatic login...")
+            login_success = login(driver, LOGIN_EMAIL, LOGIN_PASSWORD, MAIN_URL)
+            
+            if not login_success:
+                print("\n⚠️  Automatic login failed. Falling back to manual login...")
+                manual_login(driver, MAIN_URL)
         
         # Clean up extra tabs
         time.sleep(1)
