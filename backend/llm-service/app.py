@@ -109,8 +109,17 @@ col1, col2 = st.columns(2)
 with col1:
     location = st.text_input("Location (city/state):", placeholder="e.g., Bangalore, Karnataka")
 with col2:
-    career_path = st.text_input("Career Path (Optional):", 
+    stream_path = st.text_input("Streams Path (Optional):", 
                                placeholder="e.g., Data Science, Engineering")
+
+# Additional filters requested: Course Category, Specialization, University Name
+col3, col4, col5 = st.columns(3)
+with col3:
+    course_category = st.text_input("Course Category (Optional):", placeholder="e.g., Undergraduate, Postgraduate")
+with col4:
+    career_path = st.text_input("Career Path (Optional):", placeholder="e.g., Machine Learning, Civil")
+with col5:
+    university_name = st.text_input("University Name (Optional):", placeholder="e.g., Bangalore University")
 
 st.info("**Tip:** Leave Career Path empty to discover all colleges and courses, or specify to filter results.")
 
@@ -132,20 +141,41 @@ if st.button("Generate Prompts", type="secondary", use_container_width=True):
             st.session_state["college_prompt"] = ""
         if "course_prompt_template" not in st.session_state:
             st.session_state["course_prompt_template"] = ""
-        
-        college_prompt = engine.create_college_list_prompt(location)
-        st.session_state["college_prompt"] = college_prompt
-        
-        sample_colleges = [
-            type('College', (), {'name': '{COLLEGE_1}', 'website': '{WEBSITE_1}'})(),
-            type('College', (), {'name': '{COLLEGE_2}', 'website': '{WEBSITE_2}'})(),
-            type('College', (), {'name': '...', 'website': '...'})(),
-        ]
-        course_prompt = engine.create_batch_course_discovery_prompt(sample_colleges, career_path)
-        st.session_state["course_prompt_template"] = course_prompt
-        
-        st.success("✅ Prompts generated! You can edit them below before running discovery 👇")
-        st.rerun()
+        # Build combined filter string from optional inputs. Empty items are ignored.
+        filters = []
+        if stream_path:
+            filters.append(f"Streams: {stream_path}")
+        if course_category:
+            filters.append(f"Category: {course_category}")
+        if career_path:
+            filters.append(f"Career Path: {career_path}")
+        if university_name:
+            filters.append(f"University: {university_name}")
+
+        combined_filter = " | ".join(filters) if filters else "All Programs"
+
+    # College prompt: include university filter (if provided) and location context
+    college_prompt = engine.create_college_list_prompt(location, stream_path, career_path, university_name)
+    if university_name:
+        college_prompt = f"Filter: Only return colleges or universities matching the name '{university_name}'.\nLocation: {location}.\n\n" + college_prompt
+    else:
+        college_prompt = f"Location: {location}.\n\n" + college_prompt
+
+    st.session_state["college_prompt"] = college_prompt
+
+    sample_colleges = [
+        type('College', (), {'name': '{COLLEGE_1}', 'website': '{WEBSITE_1}'})(),
+        type('College', (), {'name': '{COLLEGE_2}', 'website': '{WEBSITE_2}'})(),
+    ]
+
+    # Course discovery template: pass combined_filter so the template contains category/specialization/university hints
+    course_prompt = engine.create_batch_course_discovery_prompt(sample_colleges, combined_filter)
+    # Prefix the template with explicit filter info so it is visible/editable in the UI
+    course_prompt = f"Filters: {combined_filter}\n\n" + course_prompt
+    st.session_state["course_prompt_template"] = course_prompt
+    
+    st.success("✅ Prompts generated! You can edit them below before running discovery 👇")
+    st.rerun()
 
 if st.session_state.get("college_prompt"):
     st.markdown("---")
@@ -184,7 +214,7 @@ if st.session_state.get("college_prompt"):
             st.caption("📋 **Will extract:** name, description, duration, degree_level, seats, annual_fees, entrance_exams, specializations")
     
     if st.button("🔄 Reset Prompts to Default", type="secondary"):
-        st.session_state["college_prompt"] = engine.create_college_list_prompt(location)
+        st.session_state["college_prompt"] = engine.create_college_list_prompt(location, stream_path, career_path, university_name)
         sample_colleges = [
             type('College', (), {'name': '{COLLEGE_1}', 'website': '{WEBSITE_1}'})(),
             type('College', (), {'name': '{COLLEGE_2}', 'website': '{WEBSITE_2}'})(),
@@ -219,12 +249,15 @@ if st.button("Run Discovery", type="primary", use_container_width=True):
                 try:
                     prompt_to_use = st.session_state.get("college_prompt")
                     if not prompt_to_use:
-                        prompt_to_use = engine.create_college_list_prompt(location)
+                        prompt_to_use = engine.create_college_list_prompt(location, stream_path, career_path, university_name)
                     
                     content = await engine._call_gemini(prompt_to_use, max_tokens=6000)
-                    json_match = re.search(r'\{.*\}', content, re.DOTALL)
-                    
+                    # Use non-greedy match so we don't over-capture across the entire response
+                    json_match = re.search(r'\{.*?\}', content, re.DOTALL)
+
                     if not json_match:
+                        print("No valid JSON found in response. Raw response preview:")
+                        print(content[:2000])
                         raise ValueError("No valid JSON found in response")
 
                     repaired_json_str = repair_json(json_match.group())
@@ -255,7 +288,18 @@ if st.button("Run Discovery", type="primary", use_container_width=True):
                 
                 async def discover_all_courses_batch():
                     colleges_with_courses = []
-                    
+                    # Use combined filter for discovery (includes streams, career_path, category, university)
+                    filters = []
+                    if stream_path:
+                        filters.append(f"Streams: {stream_path}")
+                    if course_category:
+                        filters.append(f"Category: {course_category}")
+                    if career_path:
+                        filters.append(f"Career Path: {career_path}")
+                    if university_name:
+                        filters.append(f"University: {university_name}")
+                    combined_filter = " | ".join(filters) if filters else "All Programs"
+
                     for i in range(0, len(colleges), batch_size):
                         batch = colleges[i:i+batch_size]
                         batch_num = i // batch_size + 1
@@ -265,7 +309,8 @@ if st.button("Run Discovery", type="primary", use_container_width=True):
                         )
                         step2_progress.progress(batch_num / total_batches)
                         
-                        batch_results = await engine._discover_batch_courses(batch, career_path)
+                        # Pass the combined filter string to the engine so prompts include category/specialization/university
+                        batch_results = await engine._discover_batch_courses(batch, combined_filter)
                         colleges_with_courses.extend(batch_results)
                     
                     return colleges_with_courses
@@ -318,6 +363,9 @@ if st.button("Run Discovery", type="primary", use_container_width=True):
             st.session_state["colleges"] = colleges
             st.session_state["location"] = location
             st.session_state["career_path"] = career_path or "All Programs"
+            st.session_state["course_category"] = course_category or ""
+            st.session_state["stream_path"] = stream_path or ""
+            st.session_state["university_name"] = university_name or ""
             st.session_state["validation_enabled"] = enable_validation
             st.session_state["model_used"] = model
 
