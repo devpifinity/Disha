@@ -4,7 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Bookmark, DollarSign, Users, TrendingUp, GraduationCap, FileText, Star, BookOpen, Target, Book } from "lucide-react";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ExamDetailsModal } from "./ExamDetailsModal";
+import { fetchCareerWithDetails, generateSlug } from "@/lib/careerQueries";
 
 const careerData = {
   "civil-engineer": {
@@ -1020,7 +1022,99 @@ const CareerDetails = () => {
     setIsExamModalOpen(true);
   };
 
-  const career = careerData[careerSlug as keyof typeof careerData];
+  // Fetch career data from database
+  const { data: dbCareerData, isLoading, error } = useQuery({
+    queryKey: ['career-details', careerSlug],
+    queryFn: () => fetchCareerWithDetails(careerSlug || ''),
+    enabled: !!careerSlug,
+    retry: false, // Don't retry on failure
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
+  // Get hardcoded career data as fallback
+  const hardcodedCareer = careerData[careerSlug as keyof typeof careerData];
+
+  // Log data source
+  console.log('🔄 [CAREER DETAILS] Data source check:', {
+    slug: careerSlug,
+    hasDbData: !!dbCareerData?.data?.career,
+    hasHardcodedData: !!hardcodedCareer,
+    isLoading,
+    error: error?.message
+  });
+
+  // Merge database data with hardcoded fallback
+  // Only use DB data if the career was actually found
+  const career = dbCareerData?.data?.career ? {
+    title: dbCareerData.data.career.name,
+    category: dbCareerData.data.career.category || hardcodedCareer?.category || 'General',
+    overview: dbCareerData.data.career.overview || hardcodedCareer?.overview || dbCareerData.data.career.description || 'No overview available.',
+    keyHighlights: dbCareerData.data.career.highlights
+      ? dbCareerData.data.career.highlights.split('\n').filter(Boolean)
+      : hardcodedCareer?.keyHighlights || [],
+    subjectsAndStream: {
+      recommendedStream: dbCareerData.data.career.recommended_stream || hardcodedCareer?.subjectsAndStream?.recommendedStream || 'Any stream',
+      essentialSubjects: dbCareerData.data.subjects
+        .filter(s => s.is_mandatory === 'yes')
+        .map(s => s.subject?.name || '')
+        .filter(Boolean),
+      optionalSubjects: dbCareerData.data.subjects
+        .filter(s => s.is_mandatory === 'no')
+        .map(s => s.subject?.name || '')
+        .filter(Boolean),
+      gradeWiseAdvice: hardcodedCareer?.subjectsAndStream?.gradeWiseAdvice || {
+        "9th-10th": "Focus on building strong foundational knowledge.",
+        "11th-12th": "Choose appropriate stream and maintain good grades."
+      }
+    },
+    jobRoles: dbCareerData.data.jobOpportunities.length > 0
+      ? dbCareerData.data.jobOpportunities.map(j => j.job_title)
+      : hardcodedCareer?.jobRoles || [],
+    skills: dbCareerData.data.skills.length > 0
+      ? dbCareerData.data.skills.map(s => s.skill?.name || '').filter(Boolean)
+      : hardcodedCareer?.skills || [],
+    salary: {
+      starting: dbCareerData.data.career.salary_starting || hardcodedCareer?.salary?.starting || 'Data not available',
+      experienced: dbCareerData.data.career.salary_experienced || hardcodedCareer?.salary?.experienced || 'Data not available',
+      senior: dbCareerData.data.career.salary_senior || hardcodedCareer?.salary?.senior || 'Data not available',
+    },
+    industryDemand: dbCareerData.data.career.industry_demand || hardcodedCareer?.industryDemand || 'Industry demand data not available.',
+    educationPathway: dbCareerData.data.career.education_pathway?.length
+      ? dbCareerData.data.career.education_pathway
+      : hardcodedCareer?.educationPathway || ['Complete relevant education and training'],
+    entranceExams: hardcodedCareer?.entranceExams || [],
+    relatedCareers: dbCareerData.data.relatedCareers.length > 0
+      ? dbCareerData.data.relatedCareers.map(rc => rc.name) // slug generated client-side if needed
+      : hardcodedCareer?.relatedCareers || [],
+  } : hardcodedCareer;
+
+  // Log final data source used
+  if (career) {
+    console.log('✅ [CAREER DETAILS] Using data:', {
+      source: dbCareerData?.data?.career ? 'Database (with fallbacks)' : 'Hardcoded only',
+      careerTitle: career.title,
+      hasOverview: !!career.overview,
+      subjectsCount: (career.subjectsAndStream?.essentialSubjects?.length || 0) + (career.subjectsAndStream?.optionalSubjects?.length || 0),
+      skillsCount: career.skills?.length || 0,
+      jobRolesCount: career.jobRoles?.length || 0
+    });
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <Card className="max-w-md mx-auto text-center p-8">
+          <CardContent>
+            <div className="animate-pulse">
+              <div className="h-6 bg-gray-200 rounded w-3/4 mx-auto mb-4"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
+            </div>
+            <p className="text-gray-600 mt-4">Loading career details...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!career) {
     return (

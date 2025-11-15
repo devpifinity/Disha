@@ -4,12 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  ArrowLeft, 
-  MapPin, 
-  Users, 
-  Star, 
-  ExternalLink, 
+import {
+  ArrowLeft,
+  MapPin,
+  Users,
+  Star,
+  ExternalLink,
   GraduationCap,
   DollarSign,
   Calendar,
@@ -24,6 +24,9 @@ import {
   HandHeart
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useQuery } from "@tanstack/react-query";
+import { fetchCollegesWithCoursesForCareer, fetchUniqueEntranceExamsForCareer } from "@/lib/collegeQueries";
+import { fetchCareerBySlug } from "@/lib/careerQueries";
 
 // Entrance exam data for select colleges (demo phase - limited scope)
 const collegeEntranceExams = {
@@ -1219,11 +1222,58 @@ const CollegesScholarships = () => {
   const { careerSlug } = useParams<{ careerSlug: string }>();
   const navigate = useNavigate();
 
-  const colleges = governmentCollegesData[careerSlug as keyof typeof governmentCollegesData] || [];
+  // Fetch career from database to get career ID
+  const { data: careerData } = useQuery({
+    queryKey: ['career-for-colleges', careerSlug],
+    queryFn: () => fetchCareerBySlug(careerSlug || ''),
+    enabled: !!careerSlug,
+  });
+
+  const careerPathId = careerData?.data?.id;
+
+  // Fetch colleges from database
+  const { data: dbCollegesData, isLoading: collegesLoading } = useQuery({
+    queryKey: ['colleges-for-career', careerPathId],
+    queryFn: () => fetchCollegesWithCoursesForCareer(careerPathId || ''),
+    enabled: !!careerPathId,
+  });
+
+  // Fetch entrance exams from database
+  const { data: dbExamsData, isLoading: examsLoading } = useQuery({
+    queryKey: ['exams-for-career', careerPathId],
+    queryFn: () => fetchUniqueEntranceExamsForCareer(careerPathId || ''),
+    enabled: !!careerPathId,
+  });
+
+  // Get hardcoded data as fallback
+  const hardcodedColleges = governmentCollegesData[careerSlug as keyof typeof governmentCollegesData] || [];
+
+  // Transform database colleges to match UI format
+  const dbColleges = dbCollegesData?.data?.map(item => ({
+    name: item.college.name,
+    location: item.college.location,
+    type: item.college.type === 'govt' ? 'Government' : 'Private',
+    rating: item.college.rating,
+    fees: 'Contact for details', // Not in DB
+    originalFees: 'Contact for details', // Not in DB
+    duration: item.courses[0]?.duration || 'Varies',
+    seats: 'Contact for details', // Not in DB
+    financialAid: item.college.scholarshipDetails || [],
+    highlights: item.college.description?.slice(0, 3) || [],
+    contact: {
+      phone: item.college.phone,
+      email: item.college.email
+    },
+    hasUnderservedScholarships: item.college.scholarshipDetails && item.college.scholarshipDetails.length > 0,
+    scholarshipDetails: item.college.scholarshipDetails?.join('; ')
+  })) || [];
+
+  // Use database colleges if available, otherwise fallback to hardcoded
+  const colleges = dbColleges.length > 0 ? dbColleges : hardcodedColleges;
 
   const careerTitles = {
     "civil-engineer": "Civil Engineering",
-    "psychologist": "Psychology", 
+    "psychologist": "Psychology",
     "data-scientist": "Data Science & Analytics",
     "teacher": "Education & Teaching",
     "graphic-designer": "Graphic Design",

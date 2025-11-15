@@ -2,6 +2,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar, FileText, Users, ExternalLink, Clock, BookOpen } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchExamByName } from "@/lib/examQueries";
 
 interface ExamDetails {
   name: string;
@@ -1001,13 +1003,55 @@ interface ExamDetailsModalProps {
 export function ExamDetailsModal({ examName, isOpen, onClose }: ExamDetailsModalProps) {
   console.log("Modal props:", { examName, isOpen });
   console.log("Available exam keys:", Object.keys(examData));
+
+  // Optional: Fetch exam from database (currently only has basic info)
+  const { data: dbExam } = useQuery({
+    queryKey: ['exam-details', examName],
+    queryFn: () => fetchExamByName(examName || ''),
+    enabled: !!examName && isOpen,
+  });
+
+  // Use hardcoded detailed data (database doesn't have detailed exam info yet)
   if (!examName || !examData[examName]) {
     console.log("No exam data found for:", examName);
     console.log("Checking exact match for:", examName, "->", !!examData[examName]);
+
+    // If we have basic DB data but no detailed data, show a minimal view
+    if (dbExam?.data) {
+      return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold text-primary">
+                {dbExam.data.name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {dbExam.data.description && dbExam.data.description.length > 0 && (
+                <div>
+                  {dbExam.data.description.map((desc, idx) => (
+                    <p key={idx} className="text-muted-foreground">{desc}</p>
+                  ))}
+                </div>
+              )}
+              <p className="text-sm text-muted-foreground">
+                Detailed exam information is not yet available. Please check the official website for more details.
+              </p>
+            </div>
+          </DialogContent>
+        </Dialog>
+      );
+    }
+
     return null;
   }
 
   const exam = examData[examName];
+
+  // Merge database description if available
+  if (dbExam?.data?.description && dbExam.data.description.length > 0) {
+    exam.description = dbExam.data.description.join(' ');
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
