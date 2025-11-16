@@ -13,7 +13,7 @@ class EvidenceStatus(Enum):
     PENDING_VERIFICATION = "pending_verification"
     VERIFIED = "verified"
     PARTIALLY_VERIFIED = "partially_verified"
-    REJECTED = "rejected"
+    NO_EVIDENCE_FOUND = "no_evidence_found"
 
 @dataclass
 class Course:

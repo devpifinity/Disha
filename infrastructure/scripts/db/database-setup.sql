@@ -215,3 +215,4 @@ CREATE TABLE public.st_course_entrance_exams(
     FOREIGN KEY (entranceexam_id) REFERENCES public.st_entrance_exam(id),
 	FOREIGN KEY (course_id) REFERENCES public.st_course(id)
 );
+
