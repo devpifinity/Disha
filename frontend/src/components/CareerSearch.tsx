@@ -8,6 +8,7 @@ import { Search, ArrowLeft, Target, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase";
 import type { CareerPath, College, Course, Exam } from "@/integrations/supabase";
 import { useQuery } from '@tanstack/react-query';
+import { generateSlug } from '@/lib/careerQueries';
 
 const CareerSearch = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,26 +21,25 @@ const CareerSearch = () => {
     const fetchCareerData = useQuery({
     queryKey: ['career-path'],
     queryFn: async () => {
+      console.log('🔍 [CAREER SEARCH] Fetching all careers from database...');
+
       const { data, error } = await supabase
+        .from('career_path')
+        .select('*')
+        .order('name');
 
-     .from("career_path")
-  .select(`
-    id,
-    name,
-    career_job_opportunity (
-      job_title,
-      college_course_jobs (
-          college(name),
-          course(name)
-        )
-      )
-    )
-  `);
+      if (error) {
+        console.log('❌ [CAREER SEARCH] Failed to fetch careers:', error.message);
+        throw error;
+      }
 
+      console.log('✅ [CAREER SEARCH] Fetched careers:', {
+        count: data?.length || 0,
+        careers: data?.map(c => ({ id: c.id, name: c.name, generatedSlug: generateSlug(c.name) }))
+      });
 
-
-      if (error) throw error;
-      setCareerPathData(data)
+      setCareerPathData(data || []);
+      return data; // IMPORTANT: Must return data for React Query
     },
   });
   
@@ -79,6 +79,7 @@ const CareerSearch = () => {
   );
 
   const handleCareerSelect = (slug: string) => {
+    console.log('🎯 [CAREER SEARCH] Navigating to career:', slug);
     navigate(`/career/${slug}`);
   };
 
@@ -161,20 +162,24 @@ const CareerSearch = () => {
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredCareers.map((career, index) => (
-                <div
-                  key={index}
-                  onClick={() => handleCareerSelect(career.slug)}
-                  className="p-4 border border-gray-200 rounded-lg hover:shadow-md hover:border-green-300 transition-all duration-300 cursor-pointer group bg-white"
-                >
-                  <div className="text-center">
-                    <div className="text-3xl mb-3">{career.emoji}</div>
-                    <h3 className="font-medium text-gray-800 group-hover:text-green-600 transition-colors">
-                      {career.name} Jobs {career.career_job_opportunity.length}
-                    </h3>
+              {filteredCareers.map((career, index) => {
+                // Generate slug on the fly from name if not present in DB
+                const careerSlug = career.slug || generateSlug(career.name);
+                return (
+                  <div
+                    key={career.id || index}
+                    onClick={() => handleCareerSelect(careerSlug)}
+                    className="p-4 border border-gray-200 rounded-lg hover:shadow-md hover:border-green-300 transition-all duration-300 cursor-pointer group bg-white"
+                  >
+                    <div className="text-center">
+                      <div className="text-3xl mb-3">{career.emoji || '💼'}</div>
+                      <h3 className="font-medium text-gray-800 group-hover:text-green-600 transition-colors">
+                        {career.name}
+                      </h3>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {filteredCareers.length === 0 && !searchTerm && (
