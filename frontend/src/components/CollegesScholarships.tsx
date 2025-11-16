@@ -24,9 +24,13 @@ import {
   HandHeart
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { saveCollege, unsaveCollege, isCollegeSaved } from "@/lib/userProfileStorage";
+import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchCollegesWithCoursesForCareer, fetchUniqueEntranceExamsForCareer } from "@/lib/collegeQueries";
+import { supabase } from "@/integrations/supabase";
 import { fetchCareerBySlug } from "@/lib/careerQueries";
+import { fetchCollegesWithCoursesForCareer, fetchUniqueEntranceExamsForCareer } from "@/lib/collegeQueries";
 
 // Entrance exam data for select colleges (demo phase - limited scope)
 const collegeEntranceExams = {
@@ -1221,59 +1225,111 @@ const affordableScholarshipsData = [
 const CollegesScholarships = () => {
   const { careerSlug } = useParams<{ careerSlug: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [savedColleges, setSavedColleges] = useState<Set<string>>(new Set());
 
-  // Fetch career from database to get career ID
+  // Fetch career ID from database
   const { data: careerData } = useQuery({
     queryKey: ['career-for-colleges', careerSlug],
-    queryFn: () => fetchCareerBySlug(careerSlug || ''),
-    enabled: !!careerSlug,
+    queryFn: async () => {
+      if (!careerSlug) return null;
+      const result = await fetchCareerBySlug(careerSlug);
+      return result.data;
+    },
+    enabled: !!careerSlug
   });
 
-  const careerPathId = careerData?.data?.id;
-
   // Fetch colleges from database
-  const { data: dbCollegesData, isLoading: collegesLoading } = useQuery({
-    queryKey: ['colleges-for-career', careerPathId],
-    queryFn: () => fetchCollegesWithCoursesForCareer(careerPathId || ''),
-    enabled: !!careerPathId,
+  const { data: dbColleges } = useQuery({
+    queryKey: ['colleges', careerData?.id],
+    queryFn: async () => {
+      if (!careerData?.id) return null;
+      const result = await fetchCollegesWithCoursesForCareer(careerData.id);
+      return result.data;
+    },
+    enabled: !!careerData?.id
   });
 
   // Fetch entrance exams from database
-  const { data: dbExamsData, isLoading: examsLoading } = useQuery({
-    queryKey: ['exams-for-career', careerPathId],
-    queryFn: () => fetchUniqueEntranceExamsForCareer(careerPathId || ''),
-    enabled: !!careerPathId,
+  const { data: dbExams } = useQuery({
+    queryKey: ['exams', careerData?.id],
+    queryFn: async () => {
+      if (!careerData?.id) return null;
+      const result = await fetchUniqueEntranceExamsForCareer(careerData.id);
+      return result.data;
+    },
+    enabled: !!careerData?.id
   });
 
-  // Get hardcoded data as fallback
-  const hardcodedColleges = governmentCollegesData[careerSlug as keyof typeof governmentCollegesData] || [];
+  // Get hardcoded fallback colleges
+  const fallbackColleges = governmentCollegesData[careerSlug as keyof typeof governmentCollegesData] || [];
 
-  // Transform database colleges to match UI format
-  const dbColleges = dbCollegesData?.data?.map(item => ({
-    name: item.college.name,
-    location: item.college.location,
-    type: item.college.type === 'govt' ? 'Government' : 'Private',
-    rating: item.college.rating,
-    fees: 'Contact for details', // Not in DB
-    originalFees: 'Contact for details', // Not in DB
-    duration: item.courses[0]?.duration || 'Varies',
-    seats: 'Contact for details', // Not in DB
-    financialAid: item.college.scholarshipDetails || [],
-    highlights: item.college.description?.slice(0, 3) || [],
-    contact: {
-      phone: item.college.phone,
-      email: item.college.email
-    },
-    hasUnderservedScholarships: item.college.scholarshipDetails && item.college.scholarshipDetails.length > 0,
-    scholarshipDetails: item.college.scholarshipDetails?.join('; ')
-  })) || [];
+  // Merge database colleges with fallback, preferring DB data
+  const colleges = dbColleges && dbColleges.length > 0
+    ? dbColleges.map(({ college, courses }) => ({
+        name: college.name,
+        location: college.location || "Location not specified",
+        type: college.type || "Government",
+        rating: college.rating || 4.0,
+        fees: "Contact college", // DB doesn't have fees structure yet
+        originalFees: "Contact college",
+        duration: courses[0]?.duration || "4 Years",
+        seats: "Contact college",
+        financialAid: ["Scholarships Available", "Contact for Details"],
+        highlights: [college.description || "Quality Education"],
+        contact: {
+          phone: college.phone || "Contact not available",
+          email: college.email || "Contact not available"
+        },
+        hasUnderservedScholarships: !!college.scholarshipDetails,
+        scholarshipDetails: college.scholarshipDetails || undefined
+      }))
+    : fallbackColleges;
 
-  // Use database colleges if available, otherwise fallback to hardcoded
-  const colleges = dbColleges.length > 0 ? dbColleges : hardcodedColleges;
+  // Initialize saved colleges from localStorage
+  useEffect(() => {
+    const saved = new Set<string>();
+    colleges.forEach(college => {
+      if (isCollegeSaved(college.name, careerSlug || '')) {
+        saved.add(college.name);
+      }
+    });
+    setSavedColleges(saved);
+  }, [careerSlug, colleges]);
+
+  const handleSaveCollege = (college: any) => {
+    const collegeKey = college.name;
+    
+    if (savedColleges.has(collegeKey)) {
+      unsaveCollege(college.name, careerSlug || '');
+      setSavedColleges(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(collegeKey);
+        return newSet;
+      });
+      toast({
+        title: "College removed",
+        description: "The college has been removed from your profile.",
+      });
+    } else {
+      saveCollege({
+        name: college.name,
+        location: college.location,
+        type: college.type,
+        fees: college.fees,
+        career: careerSlug || '',
+      });
+      setSavedColleges(prev => new Set(prev).add(collegeKey));
+      toast({
+        title: "College saved!",
+        description: "The college has been added to your profile.",
+      });
+    }
+  };
 
   const careerTitles = {
     "civil-engineer": "Civil Engineering",
-    "psychologist": "Psychology",
+    "psychologist": "Psychology", 
     "data-scientist": "Data Science & Analytics",
     "teacher": "Education & Teaching",
     "graphic-designer": "Graphic Design",
@@ -1396,7 +1452,7 @@ const CollegesScholarships = () => {
                   college.type === 'Government' ? 'border-l-green-500' : 'border-l-blue-500'
                 }`}>
                   <CardHeader>
-                    <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-start mb-2">
                       <div className="flex items-center gap-2">
                         <Badge className={`${
                           college.type === 'Government' 
@@ -1422,10 +1478,6 @@ const CollegesScholarships = () => {
                           </Tooltip>
                         )}
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                        <span className="text-sm font-medium">{college.rating}</span>
-                      </div>
                     </div>
                     <CardTitle className="text-lg">{college.name}</CardTitle>
                     <div className="flex items-center gap-1 text-gray-600">
@@ -1441,14 +1493,6 @@ const CollegesScholarships = () => {
                         <span className="font-semibold text-blue-800">Annual Fees: {college.fees}</span>
                       </div>
                       <p className="text-xs text-blue-600">Total Course: {college.originalFees}</p>
-                    </div>
-
-                    {/* Financial Aid Tags */}
-                    <div>
-                      <p className="text-sm font-medium text-gray-700 mb-2">Financial Support Available</p>
-                      <div className="flex flex-wrap gap-1">
-                        {college.financialAid.map((aid, idx) => renderFinancialAidBadge(aid, idx))}
-                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1474,6 +1518,7 @@ const CollegesScholarships = () => {
                       </div>
                     </div>
 
+
                     <div className="space-y-2 pt-4 border-t">
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Phone className="w-3 h-3" />
@@ -1485,10 +1530,19 @@ const CollegesScholarships = () => {
                       </div>
                     </div>
 
-
-                     <Button className="w-full mt-4 bg-green-600 hover:bg-green-700">
-                      Apply Now
-                    </Button>
+                    <div className="flex gap-2 mt-4">
+                      <Button 
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => handleSaveCollege(college)}
+                      >
+                        <Heart className={`w-4 h-4 mr-2 ${savedColleges.has(college.name) ? 'fill-red-500 text-red-500' : ''}`} />
+                        {savedColleges.has(college.name) ? 'Saved' : 'Save'}
+                      </Button>
+                      <Button className="flex-1 bg-green-600 hover:bg-green-700">
+                        Apply Now
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}

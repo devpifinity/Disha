@@ -24,9 +24,8 @@ export function generateSlug(name: string): string {
 }
 
 /**
- * Fetch career path by URL slug (generated from name)
- * Note: Database doesn't have slug column, so we fetch all careers
- * and match by generating slugs from their names
+ * Fetch career path by URL slug
+ * Now uses the slug column directly from the database
  */
 export async function fetchCareerBySlug(slug: string) {
   const dbInfo = getSupabaseInfo();
@@ -37,49 +36,32 @@ export async function fetchCareerBySlug(slug: string) {
     timestamp: new Date().toISOString()
   });
 
-  // Fetch all careers and find by matching generated slug
-  const { data: allCareers, error } = await supabase
+  // Fetch career directly by slug column (now available in DB)
+  const { data: career, error } = await supabase
     .from('career_path')
-    .select('*');
+    .select('*')
+    .eq('slug', slug)
+    .single();
 
   if (error) {
-    console.log('❌ [DB FETCH] Failed to fetch careers:', {
+    console.log('❌ [DB FETCH] Failed to fetch career:', {
+      slug,
       error: error.message,
       code: error.code
     });
     return { data: null, error };
   }
 
-  console.log('📊 [DB FETCH] Total careers in database:', allCareers?.length || 0);
-
-  let career = null;
-
-  if (allCareers) {
-    // Log all careers with their generated slugs
-    allCareers.forEach(c => {
-      const generatedSlug = generateSlug(c.name);
-      console.log('  - Career:', {
-        name: c.name,
-        generatedSlug,
-        matches: generatedSlug === slug
-      });
+  if (career) {
+    console.log('✅ [DB FETCH] Career found:', {
+      id: career.id,
+      name: career.name,
+      slug: career.slug,
+      hasExtendedData: !!(career.salary_starting && career.education_pathway)
     });
-
-    // Find career by matching generated slug
-    career = allCareers.find(c => generateSlug(c.name) === slug) || null;
-
-    if (career) {
-      console.log('✅ [DB FETCH] Career found by name matching:', {
-        id: career.id,
-        name: career.name,
-        generatedSlug: generateSlug(career.name)
-      });
-    } else {
-      console.log('❌ [DB FETCH] No career found matching slug:', slug);
-    }
   }
 
-  return { data: career, error: career ? null : new Error('Career not found') };
+  return { data: career as CareerPath, error: null };
 }
 
 /**
@@ -110,7 +92,7 @@ export async function fetchCareerSubjects(careerPathId: string) {
 }
 
 /**
- * Fetch career skills with skill details
+ * Fetch career skills with skill details including category and description
  */
 export async function fetchCareerSkills(careerPathId: string) {
   const { data, error } = await supabase
@@ -119,7 +101,9 @@ export async function fetchCareerSkills(careerPathId: string) {
       *,
       skill:skill_id (
         id,
-        name
+        name,
+        category,
+        description
       )
     `)
     .eq('careerpath_id', careerPathId);
@@ -153,12 +137,12 @@ export async function fetchJobOpportunities(careerPathId: string) {
 
 /**
  * Fetch related careers from same cluster
- * Note: slug field doesn't exist in DB, generated client-side
+ * Now includes slug from database
  */
 export async function fetchRelatedCareers(careerClusterId: string, excludeCareerPathId: string) {
   const { data, error } = await supabase
     .from('career_path')
-    .select('id, name')
+    .select('id, name, slug')
     .eq('career_cluster_id', careerClusterId)
     .neq('id', excludeCareerPathId)
     .limit(5);

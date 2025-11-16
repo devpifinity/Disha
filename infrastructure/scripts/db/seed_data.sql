@@ -99,59 +99,124 @@ INSERT INTO public.subject (name) VALUES
 
 
 -- ================================================================
--- PART 4: SKILLS (Professional Skills)
+-- PART 4: SKILLS (Professional Skills with Categories)
 -- ================================================================
-INSERT INTO public.skill (name) VALUES
-('Mathematical Analysis'),
-('Problem-Solving'),
-('Project Management'),
-('Technical Drawing & CAD'),
-('Communication Skills'),
-('Attention to Detail'),
-('Programming (Python, R, SQL)'),
-('Statistical Analysis'),
-('Machine Learning'),
-('Data Visualization'),
-('Critical Thinking'),
-('Business Acumen'),
-('Active Listening'),
-('Empathy & Compassion'),
-('Analytical Thinking'),
-('Research Methods'),
-('Creative Problem Solving'),
-('Adobe Creative Suite'),
-('Typography'),
-('Color Theory'),
-('Digital Marketing'),
-('Social Media Management'),
-('Content Creation'),
-('Strategic Thinking'),
-('Leadership'),
-('Patient Care'),
-('Medical Knowledge'),
-('Laboratory Techniques'),
-('Decision Making'),
-('Team Management'),
-('Physical Fitness'),
-('Adaptability'),
-('Risk Management'),
-('Financial Analysis'),
-('Customer Service'),
-('Time Management');
+INSERT INTO public.skill (name, category, description) VALUES
+-- Technical Skills
+('Mathematical Analysis', 'technical', 'Calculating structural loads, stress analysis, and solving complex mathematical problems in engineering and science'),
+('Problem-Solving', 'soft', 'Finding innovative solutions to complex challenges using analytical and creative approaches'),
+('Project Management', 'soft', 'Coordinating teams, timelines, resources, and deliverables to complete projects successfully'),
+('Technical Drawing & CAD', 'technical', 'Creating detailed blueprints and designs using AutoCAD, SolidWorks, and other CAD software'),
+('Communication Skills', 'soft', 'Presenting ideas clearly, writing effectively, and explaining complex concepts to diverse audiences'),
+('Attention to Detail', 'soft', 'Ensuring precision in measurements, specifications, and quality control processes'),
+('Programming (Python, R, SQL)', 'technical', 'Writing code to analyze data, build applications, and automate processes using modern programming languages'),
+('Statistical Analysis', 'technical', 'Finding patterns in complex datasets using statistical methods and data science techniques'),
+('Machine Learning', 'technical', 'Building predictive models and AI systems using machine learning algorithms and frameworks'),
+('Data Visualization', 'technical', 'Creating charts, dashboards, and visual representations of data using tools like Tableau, PowerBI'),
+('Critical Thinking', 'soft', 'Asking the right questions, evaluating information objectively, and making sound judgments'),
+('Business Acumen', 'soft', 'Understanding how insights drive business decisions, market dynamics, and organizational strategy'),
+('Active Listening', 'soft', 'Understanding patients and clients deeply through attentive and empathetic listening'),
+('Empathy & Compassion', 'soft', 'Connecting with clients emotionally and providing support during difficult situations'),
+('Analytical Thinking', 'soft', 'Examining cases and problems from multiple angles, interpreting behavior and mental processes'),
+('Research Methods', 'technical', 'Conducting psychological studies, experiments, and systematic investigations'),
+('Creative Problem Solving', 'soft', 'Finding visual and innovative solutions to communication and design challenges'),
+('Adobe Creative Suite', 'technical', 'Mastering Photoshop, Illustrator, InDesign for professional design work'),
+('Typography', 'technical', 'Choosing and arranging fonts effectively for visual communication and readability'),
+('Color Theory', 'technical', 'Creating harmonious color palettes and understanding color psychology in design'),
+('Digital Marketing', 'technical', 'Managing online campaigns, SEO, SEM, and digital advertising strategies'),
+('Social Media Management', 'technical', 'Handling brand pages, creating content calendars, and engaging online communities'),
+('Content Creation', 'soft', 'Writing catchy content, designing visuals, and producing engaging marketing materials'),
+('Strategic Thinking', 'soft', 'Planning long-term growth, market positioning, and competitive strategy'),
+('Leadership', 'soft', 'Inspiring teams toward common goals, commanding respect, and managing personnel effectively'),
+('Patient Care', 'technical', 'Administering medications, treatments, and providing compassionate medical support'),
+('Medical Knowledge', 'technical', 'Understanding diseases, treatments, anatomy, and medical procedures'),
+('Laboratory Techniques', 'technical', 'Conducting genetic and cellular experiments, medical tests, and research procedures'),
+('Decision Making', 'soft', 'Making critical choices under pressure, especially in high-stakes situations'),
+('Team Management', 'soft', 'Building cohesive teams, collaborating with diverse groups, and delegating effectively'),
+('Physical Fitness', 'technical', 'Maintaining strength, endurance, and peak physical condition for demanding roles'),
+('Adaptability', 'soft', 'Adjusting to changing circumstances, learning new technologies, and responding to challenges'),
+('Risk Management', 'soft', 'Making calculated business decisions and identifying potential risks'),
+('Financial Analysis', 'technical', 'Evaluating loan applications, investments, and financial performance metrics'),
+('Customer Service', 'soft', 'Helping clients with needs, resolving issues, and building positive relationships'),
+('Time Management', 'soft', 'Handling multiple patients or tasks efficiently and meeting project deadlines');
 
 
 -- ================================================================
--- PART 5: ENTRANCE EXAMS
+-- PART 5: ENTRANCE EXAMS (Enhanced with Additional Details)
 -- ================================================================
-INSERT INTO public.entrance_exam (name, description) VALUES
-('JEE Main & Advanced', 'National level engineering entrance examination. Conducted by NTA (National Testing Agency). JEE Main for NITs, IIITs, and other engineering colleges. JEE Advanced for IITs - one of India''s toughest engineering exams.'),
-('NEET UG', 'National Eligibility cum Entrance Test. For MBBS, BDS, and other medical courses. Single entrance test for all medical colleges in India. Conducted by NTA.'),
-('CAT', 'Common Admission Test for MBA programs. Conducted by IIMs (Indian Institutes of Management). Tests quantitative ability, verbal ability, and logical reasoning. Required for admission to top B-schools.'),
-('CLAT', 'Common Law Admission Test. For 5-year integrated LLB and 3-year LLB programs. Tests legal reasoning, logical reasoning, and general knowledge. For admission to National Law Universities.'),
-('NATA', 'National Aptitude Test in Architecture. For B.Arch admission to architecture colleges. Tests drawing skills, observation, and mathematical ability. Required by Council of Architecture.'),
-('UCEED', 'Undergraduate Common Entrance Examination for Design. For B.Des admission to IITs. Tests visualization, observation, and design thinking. Conducted by IIT Bombay.'),
-('GATE', 'Graduate Aptitude Test in Engineering. For M.Tech admission and PSU recruitment. Tests comprehensive understanding of engineering subjects. Valid for 3 years.'),
-('State CET exams', 'State-level Common Entrance Tests. For engineering, medical, and other professional courses. Conducted by state governments (KCET, MHT-CET, etc.). Alternative to national level exams.');
+INSERT INTO public.entrance_exam (name, description, eligibility, exam_pattern, difficulty_level, exam_dates, official_website) VALUES
+(
+  'JEE Main & Advanced',
+  'National level engineering entrance examination. Conducted by NTA (National Testing Agency). JEE Main for NITs, IIITs, and other engineering colleges. JEE Advanced for IITs - one of India''s toughest engineering exams.',
+  '12th pass or appearing with Physics, Chemistry, Mathematics. Minimum 75% aggregate (65% for SC/ST). Age limit: Born on or after Oct 1, 2000 (5 year relaxation for SC/ST).',
+  'JEE Main: 90 questions (30 each - Physics, Chemistry, Math), 3 hours, 300 marks. JEE Advanced: 2 papers (3 hours each), multiple question types including MCQ, numerical, matching.',
+  'Very Hard',
+  'JEE Main: January & April sessions. JEE Advanced: May/June (for JEE Main qualifiers only)',
+  'https://jeemain.nta.nic.in'
+),
+(
+  'NEET UG',
+  'National Eligibility cum Entrance Test. For MBBS, BDS, and other medical courses. Single entrance test for all medical colleges in India. Conducted by NTA.',
+  '12th pass or appearing with Physics, Chemistry, Biology. Minimum 50% aggregate (40% for SC/ST/OBC). Minimum age: 17 years. Upper age limit: 25 years (relaxed for reserved categories).',
+  '180 questions (45 each - Physics, Chemistry, Biology), 3 hours, 720 marks. Single paper, pen and paper based exam.',
+  'Very Hard',
+  'Typically held in May every year. Registration starts in December/January.',
+  'https://neet.nta.nic.in'
+),
+(
+  'CAT',
+  'Common Admission Test for MBA programs. Conducted by IIMs (Indian Institutes of Management). Tests quantitative ability, verbal ability, and logical reasoning. Required for admission to top B-schools.',
+  'Bachelor''s degree in any discipline with minimum 50% aggregate (45% for SC/ST/PWD). Final year students can also apply. No age limit.',
+  '3 sections: Verbal Ability & Reading Comprehension (24 questions), Data Interpretation & Logical Reasoning (20 questions), Quantitative Ability (22 questions). Total 66 questions, 120 minutes.',
+  'Hard',
+  'Held in November/December. Registration typically opens in August.',
+  'https://iimcat.ac.in'
+),
+(
+  'CLAT',
+  'Common Law Admission Test. For 5-year integrated LLB and 3-year LLB programs. Tests legal reasoning, logical reasoning, and general knowledge. For admission to National Law Universities.',
+  'For UG: 12th pass or appearing with 45% aggregate (40% for SC/ST). For PG: LLB degree with 50% marks (45% for SC/ST). No age limit.',
+  'UG: 150 questions - English, Current Affairs, Legal Reasoning, Logical Reasoning, Quantitative Techniques. 2 hours, 150 marks. PG: Similar pattern focused on law subjects.',
+  'Hard',
+  'Usually held in May. Registration opens in January/February.',
+  'https://consortiumofnlus.ac.in'
+),
+(
+  'NATA',
+  'National Aptitude Test in Architecture. For B.Arch admission to architecture colleges. Tests drawing skills, observation, and mathematical ability. Required by Council of Architecture.',
+  '12th pass or appearing with Mathematics as mandatory subject. Minimum 50% aggregate in PCM or PCB (45% for reserved categories).',
+  'Part A: 125 questions (Aptitude, Mathematics, Drawing) - 3 hours, 125 marks. Part B: Drawing test - 30 minutes, 75 marks. Total 200 marks.',
+  'Medium',
+  'Two tests per year: April and July. Multiple attempts allowed.',
+  'https://nata.in'
+),
+(
+  'UCEED',
+  'Undergraduate Common Entrance Examination for Design. For B.Des admission to IITs. Tests visualization, observation, and design thinking. Conducted by IIT Bombay.',
+  '12th pass or appearing in any stream. No specific subject requirements. Top 10% in respective boards are preferred.',
+  'Part A: Numerical Answer Type, MCQ - 2 hours. Part B: Drawing test - 1 hour. Total 300 marks covering visualization, observation, design thinking.',
+  'Hard',
+  'Held in January. Registration opens in October/November.',
+  'https://uceed.iitb.ac.in'
+),
+(
+  'GATE',
+  'Graduate Aptitude Test in Engineering. For M.Tech admission and PSU recruitment. Tests comprehensive understanding of engineering subjects. Valid for 3 years.',
+  'Bachelor''s degree in Engineering/Technology/Architecture or currently in final year. For some papers: Master''s degree in relevant science subjects.',
+  '65 questions (MCQ, MSQ, NAT) covering General Aptitude (15%) and subject-specific questions (85%). 3 hours, 100 marks. 27 different subject papers.',
+  'Hard',
+  'Held in February. Registration opens in September/October.',
+  'https://gate.iisc.ac.in'
+),
+(
+  'State CET exams',
+  'State-level Common Entrance Tests. For engineering, medical, and other professional courses. Conducted by state governments (KCET, MHT-CET, etc.). Alternative to national level exams.',
+  'Varies by state. Generally 12th pass or appearing in relevant stream. Domicile requirements may apply. Some states accept JEE/NEET scores.',
+  'Varies by state. Typically covers Physics, Chemistry, Math/Biology. Duration: 2-3 hours. Some states use OMR, others are computer-based.',
+  'Medium',
+  'Usually held in April-May. Each state has different dates. Check respective state CET websites.',
+  'Varies by state (e.g., https://kea.kar.nic.in for Karnataka)'
+);
 
 
 -- ================================================================
@@ -310,14 +375,36 @@ BEGIN
   -- ================================================================
   -- CAREER 1: CIVIL ENGINEER
   -- ================================================================
-  INSERT INTO public.career_path (name, description, highlights, type, career_stream_id, career_cluster_id)
+  INSERT INTO public.career_path (
+    name, description, highlights, type, career_stream_id, career_cluster_id,
+    slug, category, snapshot,
+    salary_starting, salary_experienced, salary_senior,
+    industry_demand, recommended_stream, student_path_example,
+    education_pathway, entrance_exams_list, grade_wise_advice,
+    essential_subjects, optional_subjects
+  )
   VALUES (
     'Civil Engineer',
     'Civil engineers design, build, and maintain the infrastructure that shapes our world. From bridges and roads to water systems and skyscrapers, you''ll create solutions that improve people''s daily lives and contribute to society''s development.',
     'Shape the physical world around us | Work on projects that last generations | High job security and growth potential | Combine creativity with technical expertise',
     'SCITECH',
     science_stream_id,
-    stem_cluster_id
+    stem_cluster_id,
+    -- New fields:
+    'civil-engineer',
+    'STEM',
+    'Design and build infrastructure that shapes modern society. Perfect for students who enjoy math, physics, and creating lasting impact.',
+    '₹3.5-6 Lakhs',
+    '₹8-15 Lakhs',
+    '₹15+ Lakhs',
+    'High demand due to India''s infrastructure development projects. Smart cities, metro expansions, and sustainable construction create excellent opportunities.',
+    'Science (PCM)',
+    'Arjun chose PCM in 11–12, cracked JEE Main, completed B.Tech in Civil Engineering from NIT, and now works on metro rail projects in Bangalore.',
+    '["Complete 12th with Physics, Chemistry, Mathematics", "Clear JEE Main & JEE Advanced for admission", "Pursue B.Tech in Civil Engineering (4 years)", "Optional: M.Tech for specialization (2 years)"]'::jsonb,
+    '["JEE Main & Advanced", "State CET exams", "KCET", "BITSAT", "VITEEE", "University-specific exams"]'::jsonb,
+    '{"9th-10th": "Focus on strong foundation in Math and Science. Develop spatial reasoning through geometry.", "11th-12th": "Choose PCM (Physics, Chemistry, Math). Maintain 75%+ for JEE eligibility."}'::jsonb,
+    '["Physics", "Chemistry", "Mathematics"]'::jsonb,
+    '["Computer Science", "Engineering Drawing"]'::jsonb
   ) RETURNING id INTO civil_engineer_id;
 
   -- Civil Engineer: Subjects
@@ -357,14 +444,36 @@ BEGIN
   -- ================================================================
   -- CAREER 2: SOFTWARE DEVELOPER
   -- ================================================================
-  INSERT INTO public.career_path (name, description, highlights, type, career_stream_id, career_cluster_id)
+  INSERT INTO public.career_path (
+    name, description, highlights, type, career_stream_id, career_cluster_id,
+    slug, category, snapshot,
+    salary_starting, salary_experienced, salary_senior,
+    industry_demand, recommended_stream, student_path_example,
+    education_pathway, entrance_exams_list, grade_wise_advice,
+    essential_subjects, optional_subjects
+  )
   VALUES (
     'Software Developer',
     'Software developers design, build, and maintain software applications and systems. You''ll write code, solve technical problems, and create digital solutions that power websites, mobile apps, and enterprise systems.',
     'High demand and excellent salary prospects | Remote work opportunities | Continuous learning and innovation | Gateway to technology leadership roles',
     'SCITECH',
     science_stream_id,
-    it_cluster_id
+    it_cluster_id,
+    -- New fields:
+    'software-developer',
+    'STEM',
+    'Build apps and software that millions use daily. Perfect for logical thinkers who enjoy coding, problem-solving, and creating digital solutions.',
+    '₹4-8 Lakhs',
+    '₹8-15 Lakhs',
+    '₹15+ Lakhs',
+    'Extremely high demand across all industries. Bangalore being the IT capital of India offers countless opportunities.',
+    'Science (PCM) or Commerce with Math',
+    'Rahul took PCM with Computer Science, pursued B.Tech in CSE, learned web development through projects, and now works as a full-stack developer at a tech company.',
+    '["Complete 12th with Mathematics", "Pursue B.Tech/BCA in Computer Science (3-4 years)", "Optional: Master''s degree for specialization"]'::jsonb,
+    '["JEE Main for B.Tech", "KCET", "Various university entrance exams", "Direct admission based on 12th marks", "Coding bootcamp assessments", "Online certification programs"]'::jsonb,
+    '{"9th-10th": "Start learning basic programming. Focus on logical thinking and mathematics.", "11th-12th": "Choose PCM or Commerce with Computer Science. Practice coding regularly."}'::jsonb,
+    '["Mathematics", "Computer Science"]'::jsonb,
+    '["Physics", "Statistics", "English"]'::jsonb
   ) RETURNING id INTO software_developer_id;
 
   -- Software Developer: Subjects
@@ -405,14 +514,36 @@ BEGIN
   -- ================================================================
   -- CAREER 3: DATA SCIENTIST
   -- ================================================================
-  INSERT INTO public.career_path (name, description, highlights, type, career_stream_id, career_cluster_id)
+  INSERT INTO public.career_path (
+    name, description, highlights, type, career_stream_id, career_cluster_id,
+    slug, category, snapshot,
+    salary_starting, salary_experienced, salary_senior,
+    industry_demand, recommended_stream, student_path_example,
+    education_pathway, entrance_exams_list, grade_wise_advice,
+    essential_subjects, optional_subjects
+  )
   VALUES (
     'Data Scientist',
     'Data scientists extract insights from complex data to solve business problems and drive decision-making. You''ll work with cutting-edge technology to uncover patterns, predict trends, and create data-driven solutions that impact millions of users.',
     'One of the fastest-growing careers globally | High earning potential and job security | Work across diverse industries | Combine math, programming, and business impact',
     'SCITECH',
     science_stream_id,
-    it_cluster_id
+    it_cluster_id,
+    -- New fields:
+    'data-scientist',
+    'STEM',
+    'Turn data into insights that drive business decisions. Perfect for students who love math, coding, and solving complex problems.',
+    '₹6-12 Lakhs',
+    '₹15-25 Lakhs',
+    '₹25+ Lakhs',
+    'Extremely high demand across all sectors. Every company needs data scientists to make sense of their data and gain competitive advantages in the digital economy.',
+    'Science (PCM) or Commerce with Math',
+    'Karthik took PCM with Computer Science, pursued B.Tech in CSE, learned Python and machine learning through online courses, and now works as a data scientist at a fintech startup.',
+    '["Complete 12th with Mathematics/Statistics", "Pursue B.Tech/BSc in Computer Science, Statistics, or Math", "Learn programming languages (Python, R, SQL)", "Build portfolio projects and gain experience"]'::jsonb,
+    '["JEE Main for Engineering colleges", "Various university entrance exams", "Direct admission based on 12th marks", "Online certification programs", "Bootcamp programs"]'::jsonb,
+    '{"9th-10th": "Build strong mathematical foundation. Start learning basic programming concepts.", "11th-12th": "Choose PCM or Commerce with Math. Focus on Statistics and Computer Science."}'::jsonb,
+    '["Mathematics", "Statistics", "Computer Science"]'::jsonb,
+    '["Physics", "Economics", "Business Studies"]'::jsonb
   ) RETURNING id INTO data_scientist_id;
 
   -- Data Scientist: Subjects

@@ -8,21 +8,29 @@ export interface CareerPath {
   id: string;
   name: string;
   description: string; // TEXT field
-  highlights: string; // TEXT field
+  highlights: string; // TEXT field (pipe-separated)
   type: string;
   career_stream_id: string;
   career_cluster_id: string;
   created_at: string;
-  // Optional fields (can be null in DB)
-  slug?: string | null;
-  category?: string | null;
-  overview?: string | null;
-  salary_starting?: string | null;
-  salary_experienced?: string | null;
-  salary_senior?: string | null;
-  industry_demand?: string | null;
-  recommended_stream?: string | null;
-  education_pathway?: string[] | null;
+  // Extended fields (now populated in DB)
+  slug: string; // URL-friendly identifier (e.g., 'civil-engineer')
+  category: string; // UI category: 'STEM', 'Helping', 'Business', 'Creative', 'Public Service'
+  snapshot: string; // Short career tagline/summary
+  salary_starting: string; // Entry-level salary range (e.g., '₹3.5-6 Lakhs')
+  salary_experienced: string; // Mid-career salary range (e.g., '₹8-15 Lakhs')
+  salary_senior: string; // Senior-level salary range (e.g., '₹15+ Lakhs')
+  industry_demand: string; // Market outlook and demand analysis
+  recommended_stream: string; // Recommended educational stream (e.g., 'Science (PCM)')
+  student_path_example: string; // Real student success story narrative
+  education_pathway: string[]; // JSONB array of education steps
+  entrance_exams_list: string[]; // JSONB array of entrance exam names
+  grade_wise_advice: {
+    '9th-10th': string;
+    '11th-12th': string;
+  }; // JSONB object with grade-specific advice
+  essential_subjects: string[]; // JSONB array of essential subject names
+  optional_subjects: string[]; // JSONB array of optional subject names
 }
 
 export interface Stream {
@@ -47,6 +55,9 @@ export interface Skill {
   id: string;
   name: string;
   created_at: string;
+  // Extended fields
+  category: 'technical' | 'soft'; // Skill type categorization
+  description: string; // Detailed skill description with context and examples
 }
 
 export interface College {
@@ -75,8 +86,14 @@ export interface Course {
 export interface EntranceExam {
   id: string;
   name: string;
-  description: string[]; // TEXT[] array
+  description: string; // TEXT field
   created_at: string;
+  // Extended fields
+  eligibility: string; // Eligibility criteria with age limits and requirements
+  exam_pattern: string; // Exam structure, sections, and format details
+  difficulty_level: 'Easy' | 'Medium' | 'Hard' | 'Very Hard'; // Difficulty assessment
+  exam_dates: string; // Typical exam schedule and registration timelines
+  official_website: string; // Official exam website URL
 }
 
 // ============================================
@@ -96,6 +113,9 @@ export interface CareerPathSkill {
   careerpath_id: string;
   skill_id: string;
   skill?: Skill; // Joined data
+  // Extended fields
+  skill_category?: 'technical' | 'soft'; // Denormalized skill category for faster filtering
+  custom_description?: string; // Career-specific skill description override
 }
 
 export interface CareerPathTag {

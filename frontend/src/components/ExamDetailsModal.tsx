@@ -1004,54 +1004,47 @@ export function ExamDetailsModal({ examName, isOpen, onClose }: ExamDetailsModal
   console.log("Modal props:", { examName, isOpen });
   console.log("Available exam keys:", Object.keys(examData));
 
-  // Optional: Fetch exam from database (currently only has basic info)
+  // Fetch exam from database
   const { data: dbExam } = useQuery({
     queryKey: ['exam-details', examName],
-    queryFn: () => fetchExamByName(examName || ''),
-    enabled: !!examName && isOpen,
+    queryFn: async () => {
+      if (!examName) return null;
+      const result = await fetchExamByName(examName);
+      return result.data;
+    },
+    enabled: !!examName && isOpen
   });
 
-  // Use hardcoded detailed data (database doesn't have detailed exam info yet)
-  if (!examName || !examData[examName]) {
+  // Use hardcoded fallback if DB exam not available
+  const fallbackExam = examName ? examData[examName] : null;
+
+  if (!examName || (!fallbackExam && !dbExam)) {
     console.log("No exam data found for:", examName);
-    console.log("Checking exact match for:", examName, "->", !!examData[examName]);
-
-    // If we have basic DB data but no detailed data, show a minimal view
-    if (dbExam?.data) {
-      return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold text-primary">
-                {dbExam.data.name}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              {dbExam.data.description && dbExam.data.description.length > 0 && (
-                <div>
-                  {dbExam.data.description.map((desc, idx) => (
-                    <p key={idx} className="text-muted-foreground">{desc}</p>
-                  ))}
-                </div>
-              )}
-              <p className="text-sm text-muted-foreground">
-                Detailed exam information is not yet available. Please check the official website for more details.
-              </p>
-            </div>
-          </DialogContent>
-        </Dialog>
-      );
-    }
-
     return null;
   }
 
-  const exam = examData[examName];
+  // Merge DB data with fallback, preferring detailed hardcoded data
+  // Database only has basic info (name, description), hardcoded has full details
+  const exam = fallbackExam || (dbExam ? {
+    name: dbExam.name,
+    fullName: dbExam.name,
+    description: dbExam.description?.[0] || "Entrance examination details",
+    eligibility: ["Contact exam authority for details"],
+    examPattern: {
+      mode: "Online/Offline",
+      duration: "Contact for details",
+      subjects: ["Subject-specific"],
+      totalMarks: "Contact for details"
+    },
+    importantDates: {
+      registration: "Check official website",
+      examDate: "Check official website",
+      results: "Check official website"
+    },
+    officialWebsite: "#"
+  } : null);
 
-  // Merge database description if available
-  if (dbExam?.data?.description && dbExam.data.description.length > 0) {
-    exam.description = dbExam.data.description.join(' ');
-  }
+  if (!exam) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
