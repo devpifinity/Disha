@@ -19,41 +19,76 @@ BATCH_DELAY = 5
 
 # Define your batch scraping tasks here
 BATCH_TASKS = [
+    # {
+    #     "course_category": "Engineering",
+    #     "specialization": None,
+    #     "city": "Tumkur",
+    #     "university": None,
+    #     "format": "json"
+    # },
     {
         "course_category": "Engineering",
         "specialization": None,
-        "city": "Chandigarh",
+        "city": "Mandya",
         "university": None,
         "format": "json"
     },
-    {
-        "course_category": "Engineering",
-        "specialization": None,
-        "city": "Bangalore",
-        "university": None,
-        "format": "json"
-    },
-    {
-        "course_category": "Engineering",
-        "specialization": None,
-        "city": "Hubli",
-        "university": None,
-        "format": "json"
-    },
-    {
-        "course_category": "Engineering",
-        "specialization": None,
-        "city": "Tumkur",
-        "university": None,
-        "format": "json"
-    },
-    {
-        "course_category": "Engineering",
-        "specialization": None,
-        "city": "Davangere",
-        "university": None,
-        "format": "json"
-    },
+    # {
+    #     "course_category": "Engineering",
+    #     "specialization": None,
+    #     "city": "Kolar",
+    #     "university": None,
+    #     "format": "json"
+    # },
+    # {
+    #     "course_category": "Engineering",
+    #     "specialization": None,
+    #     "city": "Chikkaballapur",
+    #     "university": None,
+    #     "format": "json"
+    # },
+    # {
+    #     "course_category": "Engineering",
+    #     "specialization": None,
+    #     "city": "Kanakapura",
+    #     "university": None,
+    #     "format": "json"
+    # },
+    # {
+    #     "course_category": "Engineering",
+    #     "specialization": None,
+    #     "city": "Mysore",
+    #     "university": None,
+    #     "format": "json"
+    # },
+    # {
+    #     "course_category": "Engineering",
+    #     "specialization": None,
+    #     "city": "Hosur",
+    #     "university": None,
+    #     "format": "json"
+    # },
+    # {
+    #     "course_category": "Engineering",
+    #     "specialization": None,
+    #     "city": "Krishnagiri",
+    #     "university": None,
+    #     "format": "json"
+    # },
+    # {
+    #     "course_category": "Engineering",
+    #     "specialization": None,
+    #     "city": "Hassan",
+    #     "university": None,
+    #     "format": "json"
+    # },
+    # {
+    #     "course_category": "Engineering",
+    #     "specialization": None,
+    #     "city": "Chitradurga",
+    #     "university": None,
+    #     "format": "json"
+    # },
     # Add more tasks as needed
     # Example with different parameters:
     # {

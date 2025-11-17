@@ -77,7 +77,11 @@ def create_driver(headless=False):
     """Create and configure Chrome WebDriver"""
     chrome_options = Options()
     if headless:
+        # Use headless mode when requested. Newer Chrome supports --headless=new but
+        # --headless is widely compatible.
         chrome_options.add_argument("--headless")
+        # Ensure a consistent viewport in headless mode so page elements render as expected
+        chrome_options.add_argument("--window-size=1920,1080")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
@@ -214,7 +218,8 @@ def login(driver, email, password, main_url):
         print(f"Navigating to main website: {main_url}")
         driver.get(main_url)
         wait = WebDriverWait(driver, 20)
-        time.sleep(3)
+        # Avoid long fixed sleeps; rely on explicit waits below. If the page is slow,
+        # subsequent wait.until calls will wait up to the timeout specified above.
 
         # Step 1: Click "Student Dashboard" link
         print("Step 1: Looking for 'Student Dashboard' link...")
@@ -232,11 +237,14 @@ def login(driver, email, password, main_url):
                 if dashboard_element.is_displayed():
                     print("Found 'Student Dashboard' link, clicking...")
                     dashboard_element.click()
-                    time.sleep(5)
-                    if len(driver.window_handles) > 1:
+                    # Wait briefly for a potential new tab/window (if the site opens one)
+                    try:
+                        WebDriverWait(driver, 5).until(lambda d: len(d.window_handles) > 1)
                         print("New tab opened, switching to it...")
                         driver.switch_to.window(driver.window_handles[-1])
-                        time.sleep(2)
+                    except:
+                        # no new window opened within 5s - continue
+                        pass
                     break
             except:
                 continue
@@ -244,7 +252,12 @@ def login(driver, email, password, main_url):
         if not dashboard_element:
             print("Warning: Could not find 'Student Dashboard' link. Trying to navigate directly...")
             driver.get("https://careertest.edumilestones.com/student-dashboard/")
-            time.sleep(3)
+            # Wait for either the iframe or page body to be present instead of sleeping
+            try:
+                WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, "iframe.loginIframe")))
+            except:
+                # fallback: wait for body so later waits can proceed
+                WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
 
         current_url = driver.current_url
         print(f"Current URL: {current_url}")
@@ -273,7 +286,12 @@ def login(driver, email, password, main_url):
                 document.querySelector('#login')?.classList.add('in', 'active');
                 document.querySelector('#login')?.style.removeProperty('display');
             """)
-            time.sleep(1)
+            # Wait for the login form fields to appear instead of a fixed sleep
+            try:
+                WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.ID, "email")))
+            except:
+                # allow script to continue even if wait times out
+                pass
             print("✅ 'Student Log In' tab forced active via JS.")
 
         # Step 4: Wait for login form fields
@@ -288,7 +306,8 @@ def login(driver, email, password, main_url):
         email_field.send_keys(email)
         password_field.clear()
         password_field.send_keys(password)
-        time.sleep(1)
+        # No fixed sleep here; proceed to locate/click the button. If the page needs
+        # more time, the wait below will handle it.
 
         # Step 6: Click Login
         print("\nStep 6: Clicking login button...")
@@ -300,7 +319,12 @@ def login(driver, email, password, main_url):
 
         # Step 7: Wait for login completion
         print("\nStep 7: Waiting for login to complete...")
-        time.sleep(5)
+        # Wait for a URL change or presence of a dashboard indicator. Prefer URL check
+        try:
+            WebDriverWait(driver, 30).until(lambda d: 'student-dashboard' in d.current_url.lower() or 'login' not in d.current_url.lower())
+        except:
+            # if the URL didn't change in time, continue - later checks will verify success
+            pass
 
         # Switch back to main document
         driver.switch_to.default_content()
