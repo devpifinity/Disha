@@ -79,6 +79,10 @@ def main():
     else:
         output_formats = [args.format]
     
+    # If manual_login is used, ensure JSON format is included for Supabase sync
+    if args.manual_login and 'json' not in output_formats:
+        output_formats.append('json')
+    
     print("=" * 70)
     print("College Data Downloader")
     print("=" * 70)
@@ -176,7 +180,17 @@ def main():
                 
                 # Save to specified format(s)
                 print(f"\nStep 5: Saving {len(colleges)} colleges...")
-                saved_files = save_data(colleges, OUTPUT_DIR, base_filename, output_formats)
+                saved_files = save_data(
+                    colleges, 
+                    OUTPUT_DIR, 
+                    base_filename, 
+                    output_formats,
+                    manual_login=args.manual_login,
+                    career_path=course_category,
+                    specialization=specialization,
+                    location=city,
+                    university=university
+                )
                 
                 print(f"\n✅ Success!")
                 print(f"Summary:")

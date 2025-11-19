@@ -1,6 +1,15 @@
 """
 Configuration file for login credentials and URLs
 """
+import os
+from dotenv import load_dotenv
+from pathlib import Path
+
+# Get the project root directory (parent of src/)
+project_root = Path(__file__).parent.parent
+
+# Load environment variables from .env file in project root
+load_dotenv(dotenv_path=project_root / '.env')
 
 # Login credentials
 LOGIN_EMAIL = "kundu.ansh@yahoo.com"
@@ -22,3 +31,7 @@ CSV_FILENAME = "colleges_data.csv"
 MAX_SCROLLS = 50  # Maximum number of scrolls to load all colleges
 MAX_PAGES = 10    # Maximum number of pages to scrape (pagination)
 SCROLL_PAUSE_TIME = 2  # Seconds to wait between scrolls
+
+# Supabase settings - loaded from .env file
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
