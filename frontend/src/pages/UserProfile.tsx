@@ -25,7 +25,7 @@ const careerNameToSlug = (careerName: string): string => {
   return title
     .toLowerCase()
     .replace(/\s+/g, "-")
-    .replace(/[\/&]/g, "-")
+    .replace(/[/&]/g, "-")
     .replace(/--+/g, "-");
 };
 

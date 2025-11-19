@@ -32,6 +32,26 @@ import { supabase } from "@/integrations/supabase";
 import { fetchCareerBySlug } from "@/lib/careerQueries";
 import { fetchCollegesWithCoursesForCareer, fetchUniqueEntranceExamsForCareer } from "@/lib/collegeQueries";
 
+// Type for college data
+interface CollegeData {
+  name: string;
+  location: string;
+  type: string;
+  rating: number;
+  fees: string;
+  originalFees: string;
+  duration: string;
+  seats: string;
+  financialAid: string[];
+  highlights: string[];
+  contact: {
+    phone: string;
+    email: string;
+  };
+  hasUnderservedScholarships?: boolean;
+  scholarshipDetails?: string;
+}
+
 // Entrance exam data for select colleges (demo phase - limited scope)
 const collegeEntranceExams = {
   "civil-engineer": {
@@ -1297,7 +1317,7 @@ const CollegesScholarships = () => {
     setSavedColleges(saved);
   }, [careerSlug, colleges]);
 
-  const handleSaveCollege = (college: any) => {
+  const handleSaveCollege = (college: CollegeData) => {
     const collegeKey = college.name;
     
     if (savedColleges.has(collegeKey)) {
@@ -1472,7 +1492,7 @@ const CollegesScholarships = () => {
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-xs z-[9999] bg-gray-900 text-white p-3 rounded-lg shadow-xl border border-gray-700">
                               <p className="text-sm font-medium">
-                                {(college as any).scholarshipDetails || "Financial aid and scholarships available for underserved students"}
+                                {college.scholarshipDetails || "Financial aid and scholarships available for underserved students"}
                               </p>
                             </TooltipContent>
                           </Tooltip>
