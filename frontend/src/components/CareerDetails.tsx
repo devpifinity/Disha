@@ -2,7 +2,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Bookmark, DollarSign, Users, TrendingUp, GraduationCap, FileText, Star, BookOpen, Target, Book } from "lucide-react";
+import { ArrowLeft, Bookmark, Users, TrendingUp, GraduationCap, FileText, Star, BookOpen, Target, Book } from "lucide-react";
 import { useState } from "react";
 import { ExamDetailsModal } from "./ExamDetailsModal";
 import { useQuery } from "@tanstack/react-query";
@@ -220,26 +220,6 @@ const CareerDetails = () => {
                     </p>
                   </div>
                 )}
-
-                {/* Grade-wise Advice */}
-                {career.grade_wise_advice && (
-                  <div className="pt-3 border-t">
-                    <div className="space-y-2">
-                      {career.grade_wise_advice['9th-10th'] && (
-                        <div>
-                          <p className="font-semibold text-foreground text-xs mb-1">Grade 9-10:</p>
-                          <p className="text-xs text-muted-foreground">{career.grade_wise_advice['9th-10th']}</p>
-                        </div>
-                      )}
-                      {career.grade_wise_advice['11th-12th'] && (
-                        <div>
-                          <p className="font-semibold text-foreground text-xs mb-1">Grade 11-12:</p>
-                          <p className="text-xs text-muted-foreground">{career.grade_wise_advice['11th-12th']}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>
@@ -352,40 +332,6 @@ const CareerDetails = () => {
                     <span className="font-medium text-foreground">{job.job_title}</span>
                   </div>
                 ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Salary Information */}
-        {(career.salary_starting || career.salary_experienced || career.salary_senior) && (
-          <Card className="border bg-card mb-6">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <DollarSign className="w-5 h-5 text-primary" />
-                Salary Ranges
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-3 gap-4">
-                {career.salary_starting && (
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Starting</p>
-                    <p className="text-sm font-bold text-foreground">{career.salary_starting}</p>
-                  </div>
-                )}
-                {career.salary_experienced && (
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Experienced</p>
-                    <p className="text-sm font-bold text-foreground">{career.salary_experienced}</p>
-                  </div>
-                )}
-                {career.salary_senior && (
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Senior Level</p>
-                    <p className="text-sm font-bold text-foreground">{career.salary_senior}</p>
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>
