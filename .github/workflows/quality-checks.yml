@@ -31,33 +31,41 @@ jobs:
           node-version: ${{ inputs.node-version }}
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          cd frontend
+          npm ci
 
       - name: Run TypeScript type checking
-        run: npm run typecheck
+        run: |
+          cd frontend
+          npm run typecheck
 
       - name: Run ESLint
-        run: npm run lint
+        run: |
+          cd frontend
+          npm run lint
 
       - name: Build application
-        run: npm run build
+        run: |
+          cd frontend
+          npm run build
 
       - name: Check build artifacts
         run: |
-          if [ ! -d "dist" ]; then
+          if [ ! -d "frontend/dist" ]; then
             echo "❌ Build failed - dist directory not found"
             exit 1
           fi
-          if [ ! -f "dist/index.html" ]; then
+          if [ ! -f "frontend/dist/index.html" ]; then
             echo "❌ Build failed - index.html not found"
             exit 1
           fi
           echo "✅ Build completed successfully"
-          ls -la dist/
+          ls -la frontend/dist/
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts-${{ github.sha }}
-          path: dist/
+          path: frontend/dist/
           retention-days: 7
