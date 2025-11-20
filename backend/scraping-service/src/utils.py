@@ -279,110 +279,72 @@ def save_to_supabase(
         # Format location as "city, state" if available, or just city
         location_str = location or ""
         
-        # Prepare the JSON data structure
-        llm_json = {
-            "colleges": json_data.get("colleges", json_data) if isinstance(json_data, dict) else json_data
-        }
         
-        # Prepare the record data
+        # Ensure we pass a dict for the jsonb column. Use the provided `json_data`.
+        if isinstance(json_data, dict):
+            llm_json = json_data
+        else:
+            try:
+                llm_json = json.loads(json_data)
+            except Exception:
+                llm_json = {"colleges": json_data}
+
+        # Prepare the record data (include location so upsert conflict keys match)
         record_data = {
             "career_path": career_path or None,
             "specialization": specialization or None,
             "university": university or None,
+            "location": location_str or None,
             "llm_json": llm_json
         }
         
-        # Check if record already exists based on career_path, specialization, location, and university
-        # First, try to get all columns to see what's available
+        # First try to find an existing record that matches the four key columns
+        # If found -> update the existing record. Otherwise -> insert a new record.
         try:
-            # Try to select all columns first to see what exists
-            all_records = supabase.table("search_criteria").select("*").limit(1).execute()
-            if all_records.data and len(all_records.data) > 0:
-                # Get available columns from first record
-                available_columns = list(all_records.data[0].keys())
-                print(f"Available columns in search_criteria: {available_columns}")
-                
-                # Determine location column name
-                location_column = None
-                for col in ['location', 'ion', 'city', 'loc']:
-                    if col in available_columns:
-                        location_column = col
-                        break
-                
-                if not location_column:
-                    # If no location column found, try to use the first text column that's not already used
-                    text_columns = [col for col in available_columns if col not in ['id', 'career_path', 'specialization', 'university', 'llm_json']]
-                    if text_columns:
-                        location_column = text_columns[0]
-                        print(f"⚠️  Using '{location_column}' as location column (not found in standard names)")
-        except Exception as e:
-            print(f"⚠️  Could not determine column names: {e}")
-            location_column = 'location'  # Default fallback
-        
-        # If we couldn't determine, use 'location' as default
-        if not location_column:
-            location_column = 'location'
-        
-        # Get all records with the determined location column
-        select_cols = f"id, career_path, specialization, university, {location_column}"
-        all_records = supabase.table("search_criteria").select(select_cols).execute()
-        
-        # Find matching record
-        matching_record = None
-        for record in all_records.data:
-            # Match career_path
-            record_career_path = record.get("career_path")
-            if (career_path and record_career_path != career_path) or (not career_path and record_career_path):
-                continue
-            
-            # Match specialization
-            record_specialization = record.get("specialization")
-            if (specialization and record_specialization != specialization) or (not specialization and record_specialization):
-                continue
-            
-            # Match university
-            record_university = record.get("university")
-            if (university and record_university != university) or (not university and record_university):
-                continue
-            
-            # Match location using the determined column name
-            record_location = record.get(location_column, "")
-            if location:
-                # Check if location matches (case-insensitive, partial match)
-                location_lower = location.lower().strip()
-                record_location_lower = (record_location or "").lower().strip()
-                
-                # Match if location is contained in record_location or vice versa
-                # Also handle cases where record_location might be truncated
-                if (location_lower in record_location_lower or 
-                    record_location_lower in location_lower or
-                    location_lower == record_location_lower):
-                    matching_record = record
-                    break
+            query = supabase.table("search_criteria").select("*")
+
+            # Match or is NULL depending on whether value was provided
+            if career_path:
+                query = query.eq("career_path", career_path)
             else:
-                # No location filter - match records with null/empty location
-                if not record_location or record_location.strip() == "":
-                    matching_record = record
-                    break
-        
-        if matching_record:
-            # Update existing record
-            record_id = matching_record["id"]
-            record_data[location_column] = location_str if location else None
-            response = supabase.table("search_criteria").update(record_data).eq("id", record_id).execute()
-            print(f"✅ Updated existing record in Supabase (ID: {record_id})")
-            return True
-        
-        # If no matching record found, insert new record
-        record_data[location_column] = location_str if location else None
-        response = supabase.table("search_criteria").insert(record_data).execute()
-        
-        if response.data and len(response.data) > 0:
-            print(f"✅ Inserted new record in Supabase (ID: {response.data[0].get('id', 'N/A')})")
-            return True
-        else:
-            print("⚠️  Warning: Supabase insert returned no data")
-            return False
+                query = query.is_("career_path", None)
+
+            if specialization:
+                query = query.eq("specialization", specialization)
+            else:
+                query = query.is_("specialization", None)
+
+            if university:
+                query = query.eq("university", university)
+            else:
+                query = query.is_("university", None)
+
+            if location_str:
+                query = query.eq("location", location_str)
+            else:
+                query = query.is_("location", None)
+
+            existing = query.limit(1).execute()
+
+            if getattr(existing, "data", None) and len(existing.data) > 0:
+                # Update the first matching record
+                record_id = existing.data[0].get("id")
+                if record_id:
+                    response = supabase.table("search_criteria").update(record_data).eq("id", record_id).execute()
+                    print(f"✅ Updated existing record in Supabase (ID: {record_id})")
+                    return True
+
+            # No matching record found -> insert a new one
+            response = supabase.table("search_criteria").insert(record_data).execute()
+            if getattr(response, "data", None) and len(response.data) > 0:
+                print(f"✅ Inserted new record in Supabase (ID: {response.data[0].get('id', 'N/A')})")
+                return True
+            else:
+                print("⚠️  Warning: Supabase insert returned no data")
+                return False
+        except Exception:
+            # Re-raise to be handled by outer except block below
+            raise
             
     except Exception as e:
         print(f"❌ Error saving to Supabase: {e}")
