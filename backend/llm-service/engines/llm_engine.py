@@ -18,20 +18,34 @@ class CollegeDiscoveryEngine:
         """Get default Gemini model"""
         return os.getenv("LLM_MODEL", "gemini-2.0-flash-exp")
 
-    def create_college_list_prompt(self, location: str) -> str:
-        """Create prompt for discovering colleges"""
+    def create_college_list_prompt(self, location: str, stream_path: Optional[str] = None,
+                                   career_path: Optional[str] = None,
+                                   university_name: Optional[str] = None) -> str:
+        """Create prompt for discovering colleges
+
+        Args:
+            location: location string (city/state)
+            stream_path: optional streams filter (e.g., Science, Commerce). If None, prompt will request all streams.
+        """
+        # Build conditional pieces so the prompt reads naturally depending on inputs
+        streams_text = f"Include stream : {stream_path}" if stream_path else "ALL streams"
+        career_text = f"Include career path : {career_path}" if career_path else "ALL Career Paths"
+        university_text = f"Include university name : {university_name}" if university_name else "ALL Universities"
+
         return f"""
         You are an expert educational consultant specializing in Indian higher education.
-        Task: Find ALL college and universities in {location}.
-        
+        Task: Find ALL colleges and universities in {location}.
+
         Requirements:
-        1. Only include colleges physically located in {location}
-        2. Include ALL types: Government, Private, Deemed, Central, State Universities
-        3. Include ALL streams: Engineering, Medical, Arts, Commerce, Scienc, Management, etc.
-        4. Include detailed information for each college
-        5. Be comprehensive - aim for 40-60 colleges if available in the location
-        6. Provide accurate, verifiable information
-        
+        1. Only include colleges physically located in {location}.
+        2. Include ALL types: Government, Private, Deemed, Central, State Universities.
+        3. {streams_text}.
+        4. {career_text}.
+        5. {university_text}.
+        6. Include detailed information for each college (address, contact, website, scholarships, rating, type).
+        7. Be comprehensive - aim for 40-60 colleges if available in the location.
+        8. Provide accurate, verifiable information.
+
         Output Format (JSON):
         {{
         "colleges": [
@@ -52,16 +66,16 @@ class CollegeDiscoveryEngine:
             }}
         ]
         }}
-        
+
         Important Guidelines:
-        - Focus on well-known, established institutions
-        - Use confidence scores between 0.6-0.95 (be realistic)
-        - Prioritize collegs with official websites
-        - Include as many colleges as possible from {location}
-        - For rating: use scale of 1.0-5.0 based on reputation (if unknown, use 3.5)
-        - For scholarshipdetails: mention merit-based, need-based, government schemes if known
-        - If email/phone not known, try to infer from website domain
-        - Do NOT include course information (that will be fetched separately)
+        - Focus on well-known, established institutions.
+        - Use confidence scores between 0.6-0.95 (be realistic).
+        - Prioritize colleges with official websites.
+        - Include as many colleges as possible from {location}.
+        - For rating: use scale of 1.0-5.0 based on reputation (if unknown, use 3.5).
+        - For scholarshipdetails: mention merit-based, need-based, government schemes if known.
+        - If email/phone not known, try to infer from website domain.
+        - Do NOT include course information (that will be fetched separately).
         """
     
     def create_batch_course_discovery_prompt(self, colleges: List[College], career_path: str = None) -> str:
