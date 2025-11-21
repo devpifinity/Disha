@@ -203,7 +203,18 @@ class BatchRunner:
                     
                     # Save to specified format(s)
                     print(f"\nSaving {len(colleges)} colleges...")
-                    saved_files = save_data(colleges, OUTPUT_DIR, base_filename, output_formats)
+                    # Also save/update search criteria in Supabase so records are upserted
+                    saved_files = save_data(
+                        colleges,
+                        OUTPUT_DIR,
+                        base_filename,
+                        output_formats,
+                        manual_login=True,
+                        career_path=course_category,
+                        specialization=specialization,
+                        location=city,
+                        university=university
+                    )
                     
                     task_result['status'] = 'Success'
                     task_result['colleges_found'] = len(colleges)
