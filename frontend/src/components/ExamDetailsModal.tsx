@@ -2,6 +2,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar, FileText, Users, ExternalLink, Clock, BookOpen } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchExamByName } from "@/lib/examQueries";
 
 interface ExamDetails {
   name: string;
@@ -1001,13 +1003,48 @@ interface ExamDetailsModalProps {
 export function ExamDetailsModal({ examName, isOpen, onClose }: ExamDetailsModalProps) {
   console.log("Modal props:", { examName, isOpen });
   console.log("Available exam keys:", Object.keys(examData));
-  if (!examName || !examData[examName]) {
+
+  // Fetch exam from database
+  const { data: dbExam } = useQuery({
+    queryKey: ['exam-details', examName],
+    queryFn: async () => {
+      if (!examName) return null;
+      const result = await fetchExamByName(examName);
+      return result.data;
+    },
+    enabled: !!examName && isOpen
+  });
+
+  // Use hardcoded fallback if DB exam not available
+  const fallbackExam = examName ? examData[examName] : null;
+
+  if (!examName || (!fallbackExam && !dbExam)) {
     console.log("No exam data found for:", examName);
-    console.log("Checking exact match for:", examName, "->", !!examData[examName]);
     return null;
   }
 
-  const exam = examData[examName];
+  // Merge DB data with fallback, preferring detailed hardcoded data
+  // Database only has basic info (name, description), hardcoded has full details
+  const exam = fallbackExam || (dbExam ? {
+    name: dbExam.name,
+    fullName: dbExam.name,
+    description: dbExam.description?.[0] || "Entrance examination details",
+    eligibility: ["Contact exam authority for details"],
+    examPattern: {
+      mode: "Online/Offline",
+      duration: "Contact for details",
+      subjects: ["Subject-specific"],
+      totalMarks: "Contact for details"
+    },
+    importantDates: {
+      registration: "Check official website",
+      examDate: "Check official website",
+      results: "Check official website"
+    },
+    officialWebsite: "#"
+  } : null);
+
+  if (!exam) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
