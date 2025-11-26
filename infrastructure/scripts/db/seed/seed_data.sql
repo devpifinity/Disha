@@ -10,32 +10,75 @@
 -- ================================================================
 -- Delete in correct order to respect foreign key constraints
 -- NOTE: Deleting data for all tables that this script populates
+-- Using DO blocks to handle tables that may not exist
 
--- Delete junction tables that reference career_job_opportunity (most dependent)
-DELETE FROM public.st_college_course_jobs;
-DELETE FROM public.college_course_jobs;
+DO $$ BEGIN
+  -- Delete deprecated junction tables (if they exist)
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'st_college_course_jobs') THEN
+    DELETE FROM public.st_college_course_jobs;
+  END IF;
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'college_course_jobs') THEN
+    DELETE FROM public.college_course_jobs;
+  END IF;
 
--- Delete other junction tables
-DELETE FROM public.course_skills;
-DELETE FROM public.course_entrance_exams;
+  -- Delete other junction tables (if they exist)
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'course_skills') THEN
+    DELETE FROM public.course_skills;
+  END IF;
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'course_entrance_exams') THEN
+    DELETE FROM public.course_entrance_exams;
+  END IF;
 
--- Delete career junction/relationship tables
-DELETE FROM public.careerpath_tags;
-DELETE FROM public.career_job_opportunity;
-DELETE FROM public.careerpath_skills;
-DELETE FROM public.careerpath_subjects;
+  -- Delete career junction/relationship tables
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'careerpath_tags') THEN
+    DELETE FROM public.careerpath_tags;
+  END IF;
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'career_options') THEN
+    DELETE FROM public.career_options; -- Renamed from career_job_opportunity
+  END IF;
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'careerpath_skills') THEN
+    DELETE FROM public.careerpath_skills;
+  END IF;
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'careerpath_subjects') THEN
+    DELETE FROM public.careerpath_subjects;
+  END IF;
 
--- Delete course and college data
-DELETE FROM public.course;
-DELETE FROM public.college;
+  -- Delete new junction tables (from migration 003)
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'careerpath_courses') THEN
+    DELETE FROM public.careerpath_courses;
+  END IF;
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'college_courses') THEN
+    DELETE FROM public.college_courses;
+  END IF;
 
--- Delete main career data tables
-DELETE FROM public.career_path;
-DELETE FROM public.entrance_exam;
-DELETE FROM public.skill;
-DELETE FROM public.subject;
-DELETE FROM public.stream;
-DELETE FROM public.career_cluster;
+  -- Delete course and college data
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'course') THEN
+    DELETE FROM public.course;
+  END IF;
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'college') THEN
+    DELETE FROM public.college;
+  END IF;
+
+  -- Delete main career data tables
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'career_path') THEN
+    DELETE FROM public.career_path;
+  END IF;
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'entrance_exam') THEN
+    DELETE FROM public.entrance_exam;
+  END IF;
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'skill') THEN
+    DELETE FROM public.skill;
+  END IF;
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'subject') THEN
+    DELETE FROM public.subject;
+  END IF;
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'stream') THEN
+    DELETE FROM public.stream;
+  END IF;
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'career_cluster') THEN
+    DELETE FROM public.career_cluster;
+  END IF;
+END $$;
 
 -- Reset sequences if needed (optional, for consistent IDs)
 -- Note: UUIDs are used, so sequence reset is not needed
@@ -432,7 +475,7 @@ BEGIN
     (civil_engineer_id, 'Construction');
 
   -- Civil Engineer: Job Opportunities
-  INSERT INTO public.career_job_opportunity (careerpath_id, job_title) VALUES
+  INSERT INTO public.career_options (careerpath_id, job_title) VALUES
     (civil_engineer_id, 'Structural Engineer'),
     (civil_engineer_id, 'Transportation Engineer'),
     (civil_engineer_id, 'Environmental Engineer'),
@@ -502,7 +545,7 @@ BEGIN
     (software_developer_id, 'Software Engineering');
 
   -- Software Developer: Job Opportunities
-  INSERT INTO public.career_job_opportunity (careerpath_id, job_title) VALUES
+  INSERT INTO public.career_options (careerpath_id, job_title) VALUES
     (software_developer_id, 'Full Stack Developer'),
     (software_developer_id, 'Frontend Developer'),
     (software_developer_id, 'Backend Developer'),
@@ -572,7 +615,7 @@ BEGIN
     (data_scientist_id, 'Big Data');
 
   -- Data Scientist: Job Opportunities
-  INSERT INTO public.career_job_opportunity (careerpath_id, job_title) VALUES
+  INSERT INTO public.career_options (careerpath_id, job_title) VALUES
     (data_scientist_id, 'Data Analyst'),
     (data_scientist_id, 'Machine Learning Engineer'),
     (data_scientist_id, 'Business Intelligence Analyst'),
@@ -584,14 +627,36 @@ BEGIN
   -- ================================================================
   -- CAREER 4: MECHANICAL ENGINEER
   -- ================================================================
-  INSERT INTO public.career_path (name, description, highlights, type, career_stream_id, career_cluster_id)
+  INSERT INTO public.career_path (
+    name, description, highlights, type, career_stream_id, career_cluster_id,
+    slug, category, snapshot,
+    salary_starting, salary_experienced, salary_senior,
+    industry_demand, recommended_stream, student_path_example,
+    education_pathway, entrance_exams_list, grade_wise_advice,
+    essential_subjects, optional_subjects
+  )
   VALUES (
     'Mechanical Engineer',
     'Mechanical engineers design, build, and maintain machines, engines, and mechanical systems. You''ll work on everything from automotive components to manufacturing equipment, applying principles of physics and materials science to solve real-world problems.',
     'Versatile engineering discipline | Strong job market across industries | Hands-on problem solving | Foundation for many specializations',
     'SCITECH',
     science_stream_id,
-    stem_cluster_id
+    stem_cluster_id,
+    -- Extended fields:
+    'mechanical-engineer',
+    'STEM',
+    'Design machines, engines, and mechanical systems that power industries. Perfect for students who love physics, problem-solving, and hands-on work.',
+    '₹3-5 Lakhs',
+    '₹6-12 Lakhs',
+    '₹12+ Lakhs',
+    'Strong demand in automotive, aerospace, and manufacturing sectors. Bangalore''s industrial base provides excellent opportunities.',
+    'Science (PCM)',
+    'Suresh took PCM in 11–12, cleared JEE Main, completed B.Tech in Mechanical Engineering, and now works in automotive design at a leading car manufacturer.',
+    '["Complete 12th with Physics, Chemistry, Mathematics", "Clear JEE Main for engineering admission", "Pursue B.Tech in Mechanical Engineering (4 years)", "Optional: M.Tech for specialization"]'::jsonb,
+    '["JEE Main & Advanced", "State CET exams", "BITSAT", "VITEEE", "University-specific exams"]'::jsonb,
+    '{"9th-10th": "Build strong foundation in Physics and Mathematics. Understand basic mechanics.", "11th-12th": "Choose PCM stream. Maintain 75%+ for JEE eligibility."}'::jsonb,
+    '["Physics", "Chemistry", "Mathematics"]'::jsonb,
+    '["Computer Science", "Engineering Drawing"]'::jsonb
   ) RETURNING id INTO mechanical_engineer_id;
 
   -- Mechanical Engineer: Subjects
@@ -618,7 +683,7 @@ BEGIN
     (mechanical_engineer_id, 'Automotive');
 
   -- Mechanical Engineer: Job Opportunities
-  INSERT INTO public.career_job_opportunity (careerpath_id, job_title) VALUES
+  INSERT INTO public.career_options (careerpath_id, job_title) VALUES
     (mechanical_engineer_id, 'Design Engineer'),
     (mechanical_engineer_id, 'Manufacturing Engineer'),
     (mechanical_engineer_id, 'Automotive Engineer'),
@@ -630,14 +695,36 @@ BEGIN
   -- ================================================================
   -- CAREER 5: ARCHITECT
   -- ================================================================
-  INSERT INTO public.career_path (name, description, highlights, type, career_stream_id, career_cluster_id)
+  INSERT INTO public.career_path (
+    name, description, highlights, type, career_stream_id, career_cluster_id,
+    slug, category, snapshot,
+    salary_starting, salary_experienced, salary_senior,
+    industry_demand, recommended_stream, student_path_example,
+    education_pathway, entrance_exams_list, grade_wise_advice,
+    essential_subjects, optional_subjects
+  )
   VALUES (
     'Architect',
     'Architects design buildings and spaces that are functional, safe, and aesthetically pleasing. You''ll combine creativity with technical knowledge to create structures that meet client needs while considering environmental and social factors.',
     'Blend creativity with technical expertise | Leave lasting impact on built environment | Work on diverse project types | Growing sustainable design opportunities',
     'SCITECH',
     science_stream_id,
-    stem_cluster_id
+    stem_cluster_id,
+    -- Extended fields:
+    'architect',
+    'STEM',
+    'Design beautiful, functional buildings that shape communities. Perfect for creative students with technical aptitude and spatial thinking.',
+    '₹3-5 Lakhs',
+    '₹6-12 Lakhs',
+    '₹12+ Lakhs',
+    'Strong demand due to urbanization and infrastructure development. Bangalore''s growing real estate sector offers numerous opportunities.',
+    'Science (PCM) or Arts with Math',
+    'Rohan chose PCM in 11–12, cleared NATA exam, completed B.Arch in 5 years, and now designs sustainable residential projects.',
+    '["Complete 12th with Mathematics", "Clear NATA (National Aptitude Test in Architecture)", "Pursue B.Arch (Bachelor of Architecture) - 5 years", "Register with Council of Architecture"]'::jsonb,
+    '["NATA (National Aptitude Test)", "JEE Main Paper 2 (B.Arch)", "State architecture entrance exams", "College-specific design tests", "Portfolio-based admissions"]'::jsonb,
+    '{"9th-10th": "Develop spatial reasoning and drawing skills. Understand basic geometry.", "11th-12th": "Choose PCM or Arts with Mathematics. Build a portfolio for design entrance exams."}'::jsonb,
+    '["Mathematics", "Physics"]'::jsonb,
+    '["Art", "Computer Science", "Environmental Science"]'::jsonb
   ) RETURNING id INTO architect_id;
 
   -- Architect: Subjects
@@ -664,7 +751,7 @@ BEGIN
     (architect_id, 'Construction');
 
   -- Architect: Job Opportunities
-  INSERT INTO public.career_job_opportunity (careerpath_id, job_title) VALUES
+  INSERT INTO public.career_options (careerpath_id, job_title) VALUES
     (architect_id, 'Design Architect'),
     (architect_id, 'Project Architect'),
     (architect_id, 'Landscape Architect'),
@@ -676,14 +763,36 @@ BEGIN
   -- ================================================================
   -- CAREER 6: DOCTOR
   -- ================================================================
-  INSERT INTO public.career_path (name, description, highlights, type, career_stream_id, career_cluster_id)
+  INSERT INTO public.career_path (
+    name, description, highlights, type, career_stream_id, career_cluster_id,
+    slug, category, snapshot,
+    salary_starting, salary_experienced, salary_senior,
+    industry_demand, recommended_stream, student_path_example,
+    education_pathway, entrance_exams_list, grade_wise_advice,
+    essential_subjects, optional_subjects
+  )
   VALUES (
     'Doctor',
     'Doctors diagnose, treat, and prevent diseases to improve patients'' health and well-being. You''ll work directly with patients, make life-saving decisions, and contribute to medical research and healthcare advancement.',
     'Save lives and improve health outcomes | Highly respected profession | Excellent earning potential | Opportunities for specialization',
     'MEDIC',
     science_stream_id,
-    health_cluster_id
+    health_cluster_id,
+    -- Extended fields:
+    'doctor',
+    'Helping',
+    'Diagnose, treat, and save lives as a medical professional. Ideal for dedicated students with strong science skills and compassion for others.',
+    '₹6-10 Lakhs',
+    '₹10-20 Lakhs',
+    '₹20+ Lakhs',
+    'High demand across all healthcare sectors. Growing healthcare infrastructure in Bangalore provides excellent opportunities.',
+    'Science (PCB)',
+    'Meera took PCB in 11–12, scored 650+ in NEET, completed MBBS in 5.5 years, and now works as a pediatrician at a children''s hospital.',
+    '["Complete 12th with Physics, Chemistry, Biology", "Clear NEET examination", "Pursue MBBS (5.5 years including internship)", "Optional: MD/MS for specialization (3 years)"]'::jsonb,
+    '["NEET (National Eligibility Test)", "AIIMS entrance (now merged with NEET)", "State medical entrance exams", "NEET PG for specialization", "Various fellowship entrance exams"]'::jsonb,
+    '{"9th-10th": "Focus on Biology and Chemistry. Develop strong study habits and dedication.", "11th-12th": "Choose PCB stream. Maintain 90%+ for NEET qualification."}'::jsonb,
+    '["Physics", "Chemistry", "Biology"]'::jsonb,
+    '["Mathematics", "English"]'::jsonb
   ) RETURNING id INTO doctor_id;
 
   -- Doctor: Subjects
@@ -711,7 +820,7 @@ BEGIN
     (doctor_id, 'Lifesaving');
 
   -- Doctor: Job Opportunities
-  INSERT INTO public.career_job_opportunity (careerpath_id, job_title) VALUES
+  INSERT INTO public.career_options (careerpath_id, job_title) VALUES
     (doctor_id, 'General Physician'),
     (doctor_id, 'Specialist Doctor'),
     (doctor_id, 'Surgeon'),
@@ -723,14 +832,36 @@ BEGIN
   -- ================================================================
   -- CAREER 7: NURSE
   -- ================================================================
-  INSERT INTO public.career_path (name, description, highlights, type, career_stream_id, career_cluster_id)
+  INSERT INTO public.career_path (
+    name, description, highlights, type, career_stream_id, career_cluster_id,
+    slug, category, snapshot,
+    salary_starting, salary_experienced, salary_senior,
+    industry_demand, recommended_stream, student_path_example,
+    education_pathway, entrance_exams_list, grade_wise_advice,
+    essential_subjects, optional_subjects
+  )
   VALUES (
     'Nurse',
     'Nurses provide direct patient care, educate patients and families about health conditions, and assist healthcare teams. You''ll work in hospitals, clinics, or community settings, making a difference in people''s health and well-being.',
     'High job security and constant demand | Meaningful work helping patients heal | Diverse specialization opportunities | Growing field with good career prospects',
     'MEDIC',
     science_stream_id,
-    health_cluster_id
+    health_cluster_id,
+    -- Extended fields:
+    'nurse',
+    'Helping',
+    'Provide compassionate patient care and support healthcare teams. Perfect for caring students with strong science background and empathy.',
+    '₹2.5-4 Lakhs',
+    '₹4-7 Lakhs',
+    '₹7+ Lakhs',
+    'Very high demand in healthcare sector. Aging population and expanding healthcare services create excellent job opportunities.',
+    'Science (PCB)',
+    'Lakshmi took PCB in 11–12, pursued B.Sc Nursing, completed her internship, and now works as an ICU nurse at a multi-specialty hospital.',
+    '["Complete 12th with Physics, Chemistry, Biology", "Pursue B.Sc Nursing (4 years) or GNM (3.5 years)", "Complete internship and registration", "Optional: M.Sc Nursing for specialization"]'::jsonb,
+    '["NEET (for some colleges)", "State nursing entrance exams", "AIIMS Nursing Entrance", "JIPMER Nursing", "College-specific entrance tests"]'::jsonb,
+    '{"9th-10th": "Focus on Biology and Chemistry. Develop compassion and communication skills.", "11th-12th": "Choose PCB (Physics, Chemistry, Biology). Maintain 50%+ for nursing college eligibility."}'::jsonb,
+    '["Biology", "Chemistry", "Physics"]'::jsonb,
+    '["Psychology", "English", "Computer Science"]'::jsonb
   ) RETURNING id INTO nurse_id;
 
   -- Nurse: Subjects
@@ -758,7 +889,7 @@ BEGIN
     (nurse_id, 'Nursing');
 
   -- Nurse: Job Opportunities
-  INSERT INTO public.career_job_opportunity (careerpath_id, job_title) VALUES
+  INSERT INTO public.career_options (careerpath_id, job_title) VALUES
     (nurse_id, 'Staff Nurse'),
     (nurse_id, 'ICU Nurse'),
     (nurse_id, 'Pediatric Nurse'),
@@ -770,14 +901,36 @@ BEGIN
   -- ================================================================
   -- CAREER 8: PHYSIOTHERAPIST
   -- ================================================================
-  INSERT INTO public.career_path (name, description, highlights, type, career_stream_id, career_cluster_id)
+  INSERT INTO public.career_path (
+    name, description, highlights, type, career_stream_id, career_cluster_id,
+    slug, category, snapshot,
+    salary_starting, salary_experienced, salary_senior,
+    industry_demand, recommended_stream, student_path_example,
+    education_pathway, entrance_exams_list, grade_wise_advice,
+    essential_subjects, optional_subjects
+  )
   VALUES (
     'Physiotherapist',
     'Physiotherapists help patients recover from injuries, manage chronic conditions, and improve physical function. You''ll use exercise, manual therapy, and rehabilitation techniques to restore mobility and quality of life.',
     'Direct patient interaction and impact | Growing demand in healthcare | Flexible work settings available | Rewarding rehabilitation work',
     'MEDIC',
     science_stream_id,
-    health_cluster_id
+    health_cluster_id,
+    -- Extended fields:
+    'physiotherapist',
+    'Helping',
+    'Help patients recover mobility and live pain-free. Perfect for students with empathy, physical awareness, and interest in rehabilitation.',
+    '₹2.5-4 Lakhs',
+    '₹4-8 Lakhs',
+    '₹8+ Lakhs',
+    'Growing demand due to aging population and sports injuries. Rehabilitation centers and wellness clinics offer opportunities.',
+    'Science (PCB)',
+    'Deepak took PCB in 11–12, pursued BPT (Bachelor of Physiotherapy), completed internship, and now works as a sports physiotherapist with a cricket team.',
+    '["Complete 12th with Physics, Chemistry, Biology", "Pursue BPT (Bachelor of Physiotherapy) - 4.5 years", "Complete 6-month internship", "Optional: MPT for specialization"]'::jsonb,
+    '["NEET (for some colleges)", "State physiotherapy entrance exams", "AIIMS physiotherapy entrance", "College-specific entrance tests", "State CET exams"]'::jsonb,
+    '{"9th-10th": "Focus on Biology and develop physical fitness. Learn about human anatomy.", "11th-12th": "Choose PCB stream. Physical education as additional subject is beneficial."}'::jsonb,
+    '["Biology", "Chemistry", "Physics"]'::jsonb,
+    '["Physical Education", "Psychology"]'::jsonb
   ) RETURNING id INTO physiotherapist_id;
 
   -- Physiotherapist: Subjects
@@ -803,7 +956,7 @@ BEGIN
     (physiotherapist_id, 'Sports Medicine');
 
   -- Physiotherapist: Job Opportunities
-  INSERT INTO public.career_job_opportunity (careerpath_id, job_title) VALUES
+  INSERT INTO public.career_options (careerpath_id, job_title) VALUES
     (physiotherapist_id, 'Clinical Physiotherapist'),
     (physiotherapist_id, 'Sports Physiotherapist'),
     (physiotherapist_id, 'Pediatric Physiotherapist'),
@@ -814,14 +967,36 @@ BEGIN
   -- ================================================================
   -- CAREER 9: MARKETING SPECIALIST
   -- ================================================================
-  INSERT INTO public.career_path (name, description, highlights, type, career_stream_id, career_cluster_id)
+  INSERT INTO public.career_path (
+    name, description, highlights, type, career_stream_id, career_cluster_id,
+    slug, category, snapshot,
+    salary_starting, salary_experienced, salary_senior,
+    industry_demand, recommended_stream, student_path_example,
+    education_pathway, entrance_exams_list, grade_wise_advice,
+    essential_subjects, optional_subjects
+  )
   VALUES (
     'Marketing Specialist',
     'Marketing specialists develop and execute strategies to promote products, services, and brands. You''ll analyze market trends, understand consumer behavior, and create campaigns that drive business growth and build brand awareness.',
     'Dynamic and ever-changing field | High growth potential in digital era | Creative and analytical work combined | Strong networking opportunities',
     'BUSINESS',
     commerce_stream_id,
-    business_cluster_id
+    business_cluster_id,
+    -- Extended fields:
+    'marketing-specialist',
+    'Business',
+    'Combine creativity with business strategy to help brands grow. Ideal for students who enjoy communication, analysis, and innovation.',
+    '₹3-5 Lakhs',
+    '₹6-12 Lakhs',
+    '₹12+ Lakhs',
+    'Marketing professionals are in high demand as every business goes digital. The global digital marketing industry is expected to grow over 10% annually, creating new roles for skilled professionals.',
+    'Commerce / Arts',
+    'Riya took Commerce in 11–12, completed BBA in Marketing, learned Google Ads through an online course, and now manages social media for a startup.',
+    '["Complete 12th with Commerce or Arts stream", "Pursue BBA or BCom in Marketing (3 years)", "Gain certifications in Digital Marketing", "Optional: MBA in Marketing (2 years)"]'::jsonb,
+    '["CUET for central universities", "State CET exams", "CAT/MAT for MBA", "College-specific entrance tests", "Digital marketing certifications"]'::jsonb,
+    '{"9th-10th": "Develop communication skills and understand basic business concepts.", "11th-12th": "Choose Commerce with Business Studies. Focus on Economics and English."}'::jsonb,
+    '["Business Studies", "Economics", "English"]'::jsonb,
+    '["Psychology", "Computer Science", "Mathematics"]'::jsonb
   ) RETURNING id INTO marketing_specialist_id;
 
   -- Marketing Specialist: Subjects
@@ -849,7 +1024,7 @@ BEGIN
     (marketing_specialist_id, 'Branding');
 
   -- Marketing Specialist: Job Opportunities
-  INSERT INTO public.career_job_opportunity (careerpath_id, job_title) VALUES
+  INSERT INTO public.career_options (careerpath_id, job_title) VALUES
     (marketing_specialist_id, 'Digital Marketing Manager'),
     (marketing_specialist_id, 'Brand Manager'),
     (marketing_specialist_id, 'Social Media Manager'),
@@ -861,14 +1036,36 @@ BEGIN
   -- ================================================================
   -- CAREER 10: ACCOUNTANT
   -- ================================================================
-  INSERT INTO public.career_path (name, description, highlights, type, career_stream_id, career_cluster_id)
+  INSERT INTO public.career_path (
+    name, description, highlights, type, career_stream_id, career_cluster_id,
+    slug, category, snapshot,
+    salary_starting, salary_experienced, salary_senior,
+    industry_demand, recommended_stream, student_path_example,
+    education_pathway, entrance_exams_list, grade_wise_advice,
+    essential_subjects, optional_subjects
+  )
   VALUES (
     'Accountant',
     'Accountants maintain financial records, ensure compliance with regulations, and provide financial insights to businesses. You''ll be essential in helping organizations make informed financial decisions and maintain transparency.',
     'High demand across all industries | Clear career progression path | Option to start own practice | Recession-proof profession',
     'BUSINESS',
     commerce_stream_id,
-    business_cluster_id
+    business_cluster_id,
+    -- Extended fields:
+    'accountant',
+    'Business',
+    'Manage financial records and ensure business compliance. Great for detail-oriented students with strong mathematical and analytical skills.',
+    '₹2.5-4 Lakhs',
+    '₹5-10 Lakhs',
+    '₹12+ Lakhs',
+    'Consistent demand across all sectors. Growing need for compliance and financial transparency creates stable opportunities.',
+    'Commerce',
+    'Neha took Commerce with Accountancy in 11–12, pursued BCom, cleared CA Foundation, and now works as an audit associate at a Big 4 firm.',
+    '["Complete 12th with Commerce (Accountancy)", "Pursue B.Com in Accounting/Finance", "Optional: Professional courses (CA, CMA, CS)", "Gain practical experience through internships"]'::jsonb,
+    '["CA Foundation (for Chartered Accountancy)", "CMA Foundation (Cost Management)", "CS Foundation (Company Secretary)", "University entrance exams"]'::jsonb,
+    '{"9th-10th": "Build strong foundation in Mathematics. Develop attention to detail and organization skills.", "11th-12th": "Choose Commerce stream with Accountancy as main subject. Maintain good grades for professional courses."}'::jsonb,
+    '["Accountancy", "Mathematics", "Economics"]'::jsonb,
+    '["Business Studies", "Computer Science", "Statistics"]'::jsonb
   ) RETURNING id INTO accountant_id;
 
   -- Accountant: Subjects
@@ -895,7 +1092,7 @@ BEGIN
     (accountant_id, 'Commerce');
 
   -- Accountant: Job Opportunities
-  INSERT INTO public.career_job_opportunity (careerpath_id, job_title) VALUES
+  INSERT INTO public.career_options (careerpath_id, job_title) VALUES
     (accountant_id, 'Staff Accountant'),
     (accountant_id, 'Senior Accountant'),
     (accountant_id, 'Tax Consultant'),
@@ -907,14 +1104,36 @@ BEGIN
   -- ================================================================
   -- CAREER 11: LAWYER
   -- ================================================================
-  INSERT INTO public.career_path (name, description, highlights, type, career_stream_id, career_cluster_id)
+  INSERT INTO public.career_path (
+    name, description, highlights, type, career_stream_id, career_cluster_id,
+    slug, category, snapshot,
+    salary_starting, salary_experienced, salary_senior,
+    industry_demand, recommended_stream, student_path_example,
+    education_pathway, entrance_exams_list, grade_wise_advice,
+    essential_subjects, optional_subjects
+  )
   VALUES (
     'Lawyer',
     'Lawyers provide legal advice, represent clients in court, and help navigate complex legal systems. You''ll research laws, draft legal documents, and advocate for clients'' rights in various legal matters.',
     'Fight for justice and clients'' rights | Intellectual and challenging work | High earning potential | Prestigious career with social impact',
     'BUSINESS',
     arts_stream_id,
-    business_cluster_id
+    business_cluster_id,
+    -- Extended fields:
+    'lawyer',
+    'Business',
+    'Fight for justice and represent clients in legal matters. Great for students with strong analytical, communication, and debate skills.',
+    '₹3-6 Lakhs',
+    '₹8-15 Lakhs',
+    '₹15+ Lakhs',
+    'Growing demand in corporate sector, especially in IT capital Bangalore. Increasing litigation and compliance requirements create opportunities.',
+    'Arts/Commerce',
+    'Aditya took Arts in 11–12, cleared CLAT, completed BA LLB in 5 years, and now practices corporate law at a leading firm.',
+    '["Complete 12th in any stream", "Clear CLAT or other law entrance exams", "Pursue LLB (3 years) or BA LLB (5 years)", "Register with Bar Council"]'::jsonb,
+    '["CLAT (Common Law Admission Test)", "LSAT India", "State law entrance exams", "University-specific law tests", "All India Law Entrance Test"]'::jsonb,
+    '{"9th-10th": "Develop strong reading, writing, and debating skills. Follow current affairs.", "11th-12th": "Choose Arts or Commerce. Focus on English and analytical subjects."}'::jsonb,
+    '["English", "Political Science"]'::jsonb,
+    '["History", "Economics", "Psychology"]'::jsonb
   ) RETURNING id INTO lawyer_id;
 
   -- Lawyer: Subjects
@@ -940,7 +1159,7 @@ BEGIN
     (lawyer_id, 'Advocacy');
 
   -- Lawyer: Job Opportunities
-  INSERT INTO public.career_job_opportunity (careerpath_id, job_title) VALUES
+  INSERT INTO public.career_options (careerpath_id, job_title) VALUES
     (lawyer_id, 'Corporate Lawyer'),
     (lawyer_id, 'Criminal Lawyer'),
     (lawyer_id, 'Civil Rights Lawyer'),
@@ -952,14 +1171,36 @@ BEGIN
   -- ================================================================
   -- CAREER 12: GRAPHIC DESIGNER
   -- ================================================================
-  INSERT INTO public.career_path (name, description, highlights, type, career_stream_id, career_cluster_id)
+  INSERT INTO public.career_path (
+    name, description, highlights, type, career_stream_id, career_cluster_id,
+    slug, category, snapshot,
+    salary_starting, salary_experienced, salary_senior,
+    industry_demand, recommended_stream, student_path_example,
+    education_pathway, entrance_exams_list, grade_wise_advice,
+    essential_subjects, optional_subjects
+  )
   VALUES (
     'Graphic Designer',
     'Graphic designers create visual content that communicates messages, tells stories, and solves problems. You''ll work with typography, imagery, and color to create designs for digital media, print, branding, and marketing materials.',
     'Express creativity in your daily work | Work across diverse industries | Strong freelance opportunities | Digital revolution expanding demand',
     'CREATIVE',
     arts_stream_id,
-    arts_cluster_id
+    arts_cluster_id,
+    -- Extended fields:
+    'graphic-designer',
+    'Creative',
+    'Design visual content for brands, media, and marketing. Perfect for artistic students who love combining creativity with technology.',
+    '₹2.5-4 Lakhs',
+    '₹4-8 Lakhs',
+    '₹8+ Lakhs',
+    'High demand in digital marketing, advertising, and tech startups. Bangalore''s thriving startup ecosystem offers excellent opportunities.',
+    'Any stream with Art background',
+    'Priya took Arts with Computer Science in 11–12, completed B.Des in Graphic Design from NID, and now works as a senior designer at a top ad agency.',
+    '["Complete 12th with Art/Design subjects", "Pursue B.Des/BFA in Graphic Design (4 years)", "Build portfolio and intern at design studios", "Optional: Specialization in UX/UI or Animation"]'::jsonb,
+    '["NID DAT (National Institute of Design)", "NIFT entrance exam", "UCEED (IIT design entrance)", "CEED for M.Des", "College-specific portfolio reviews"]'::jsonb,
+    '{"9th-10th": "Develop drawing and digital art skills. Learn basic design software like Canva or Adobe tools.", "11th-12th": "Take Art/Fine Arts. Build a portfolio. Learn Adobe Creative Suite basics."}'::jsonb,
+    '["Art/Fine Arts", "Computer Science"]'::jsonb,
+    '["English", "Business Studies", "Psychology"]'::jsonb
   ) RETURNING id INTO graphic_designer_id;
 
   -- Graphic Designer: Subjects
@@ -986,7 +1227,7 @@ BEGIN
     (graphic_designer_id, 'Visual Communication');
 
   -- Graphic Designer: Job Opportunities
-  INSERT INTO public.career_job_opportunity (careerpath_id, job_title) VALUES
+  INSERT INTO public.career_options (careerpath_id, job_title) VALUES
     (graphic_designer_id, 'Brand Designer'),
     (graphic_designer_id, 'UI/UX Designer'),
     (graphic_designer_id, 'Print Designer'),
@@ -998,14 +1239,36 @@ BEGIN
   -- ================================================================
   -- CAREER 13: PSYCHOLOGIST
   -- ================================================================
-  INSERT INTO public.career_path (name, description, highlights, type, career_stream_id, career_cluster_id)
+  INSERT INTO public.career_path (
+    name, description, highlights, type, career_stream_id, career_cluster_id,
+    slug, category, snapshot,
+    salary_starting, salary_experienced, salary_senior,
+    industry_demand, recommended_stream, student_path_example,
+    education_pathway, entrance_exams_list, grade_wise_advice,
+    essential_subjects, optional_subjects
+  )
   VALUES (
     'Psychologist',
     'Psychologists study human behavior and mental processes to help people overcome challenges, improve their well-being, and reach their potential. You''ll make a meaningful impact by supporting individuals, families, and communities.',
     'Make a real difference in people''s lives | Growing field with increasing awareness | Diverse specialization opportunities | Flexible career paths available',
     'SOCIAL',
     arts_stream_id,
-    human_services_cluster_id
+    human_services_cluster_id,
+    -- Extended fields:
+    'psychologist',
+    'Helping',
+    'Help people improve mental health and well-being. Ideal for empathetic students interested in understanding human behavior and making a difference.',
+    '₹3-5 Lakhs',
+    '₹5-10 Lakhs',
+    '₹10+ Lakhs',
+    'Growing demand due to increased mental health awareness. Corporate counseling, schools, and hospitals all need psychologists.',
+    'Arts (with Psychology)',
+    'Ananya took Arts with Psychology in 11–12, completed BA Psychology and M.Phil, and now works as a clinical psychologist at a wellness center.',
+    '["Complete 12th with Psychology", "Pursue BA Psychology (3 years)", "Complete MA in Psychology (2 years)", "Obtain M.Phil/Ph.D for clinical practice (2-3 years)", "Register with RCI (Rehabilitation Council of India)"]'::jsonb,
+    '["University entrance exams", "DU JAT (Delhi University)", "BHU UET (Banaras Hindu University)", "CUET for central universities", "State university entrance tests"]'::jsonb,
+    '{"9th-10th": "Develop interest in human behavior and mental health. Read books on psychology. Build empathy and listening skills.", "11th-12th": "Take Arts with Psychology as main subject. Maintain good grades for university admissions."}'::jsonb,
+    '["Psychology", "English"]'::jsonb,
+    '["Biology", "Sociology", "Statistics"]'::jsonb
   ) RETURNING id INTO psychologist_id;
 
   -- Psychologist: Subjects
@@ -1031,7 +1294,7 @@ BEGIN
     (psychologist_id, 'Social Science');
 
   -- Psychologist: Job Opportunities
-  INSERT INTO public.career_job_opportunity (careerpath_id, job_title) VALUES
+  INSERT INTO public.career_options (careerpath_id, job_title) VALUES
     (psychologist_id, 'Clinical Psychologist'),
     (psychologist_id, 'Counseling Psychologist'),
     (psychologist_id, 'School Psychologist'),
@@ -1043,14 +1306,36 @@ BEGIN
   -- ================================================================
   -- CAREER 14: TEACHER
   -- ================================================================
-  INSERT INTO public.career_path (name, description, highlights, type, career_stream_id, career_cluster_id)
+  INSERT INTO public.career_path (
+    name, description, highlights, type, career_stream_id, career_cluster_id,
+    slug, category, snapshot,
+    salary_starting, salary_experienced, salary_senior,
+    industry_demand, recommended_stream, student_path_example,
+    education_pathway, entrance_exams_list, grade_wise_advice,
+    essential_subjects, optional_subjects
+  )
   VALUES (
     'Teacher',
     'Teachers educate and inspire students across various subjects and age groups. You''ll plan lessons, assess student progress, and play a crucial role in shaping the next generation''s knowledge, skills, and character development.',
     'Make a lasting impact on students'' lives | Job security and stable career | Opportunities for continuous learning | Respected profession in society',
     'SOCIAL',
     arts_stream_id,
-    human_services_cluster_id
+    human_services_cluster_id,
+    -- Extended fields:
+    'teacher',
+    'Public Service',
+    'Shape future generations by teaching and mentoring students. Perfect for patient, communicative individuals passionate about education and child development.',
+    '₹3-5 Lakhs',
+    '₹5-8 Lakhs',
+    '₹8+ Lakhs',
+    'Consistent demand in schools and educational institutions. Government teaching positions offer excellent job security and benefits.',
+    'Any stream (Arts, Science, Commerce)',
+    'Kavya completed 12th in Science, pursued B.Ed after graduation, cleared CTET exam, and now teaches mathematics at a CBSE school.',
+    '["Complete 12th in any stream", "Pursue graduation (BA/BSc/BCom) in subject of interest (3 years)", "Complete B.Ed (Bachelor of Education) - 2 years", "Clear CTET/State TET for teaching certification", "Optional: M.Ed for career advancement"]'::jsonb,
+    '["CTET (Central Teacher Eligibility Test)", "State TETs", "B.Ed entrance exams", "NTPC for KVS/NVS", "DSSSB for Delhi government schools"]'::jsonb,
+    '{"9th-10th": "Develop communication and presentation skills. Excel in your favorite subjects. Consider student leadership roles.", "11th-12th": "Choose stream based on subject you want to teach. Maintain good academic record for graduation admissions."}'::jsonb,
+    '["English", "Subject specialization (Math/Science/Social Studies)"]'::jsonb,
+    '["Psychology", "Education Theory", "Computer Science"]'::jsonb
   ) RETURNING id INTO teacher_id;
 
   -- Teacher: Subjects (any stream works for teaching)
@@ -1075,7 +1360,7 @@ BEGIN
     (teacher_id, 'Student Development');
 
   -- Teacher: Job Opportunities
-  INSERT INTO public.career_job_opportunity (careerpath_id, job_title) VALUES
+  INSERT INTO public.career_options (careerpath_id, job_title) VALUES
     (teacher_id, 'Primary School Teacher'),
     (teacher_id, 'Secondary School Teacher'),
     (teacher_id, 'Subject Specialist'),
@@ -1087,14 +1372,36 @@ BEGIN
   -- ================================================================
   -- CAREER 15: ENTREPRENEUR
   -- ================================================================
-  INSERT INTO public.career_path (name, description, highlights, type, career_stream_id, career_cluster_id)
+  INSERT INTO public.career_path (
+    name, description, highlights, type, career_stream_id, career_cluster_id,
+    slug, category, snapshot,
+    salary_starting, salary_experienced, salary_senior,
+    industry_demand, recommended_stream, student_path_example,
+    education_pathway, entrance_exams_list, grade_wise_advice,
+    essential_subjects, optional_subjects
+  )
   VALUES (
     'Entrepreneur',
     'Entrepreneurs start and manage their own businesses, identifying opportunities and taking calculated risks to create value. You''ll innovate, lead teams, and build ventures that can transform industries and create employment.',
     'Be your own boss and build from scratch | Unlimited earning potential | Create jobs and contribute to economy | Personal and professional growth opportunities',
     'BUSINESS',
     commerce_stream_id,
-    business_cluster_id
+    business_cluster_id,
+    -- Extended fields:
+    'entrepreneur',
+    'Business',
+    'Start and grow your own business ventures. Ideal for risk-takers with innovative ideas, leadership skills, and business acumen.',
+    '₹0-5 Lakhs (Variable)',
+    '₹5-15 Lakhs',
+    '₹15+ Lakhs (Unlimited potential)',
+    'Bangalore startup ecosystem thriving with incubators, investors, and support systems. Government schemes encourage entrepreneurship.',
+    'Commerce/Any stream with Business Studies',
+    'Arjun studied Commerce in 11–12, completed BBA and MBA, worked in a startup for 2 years, then founded his own e-commerce platform which raised seed funding.',
+    '["Complete 12th (any stream, Commerce preferred)", "Pursue BBA/B.Tech/Any degree (3-4 years)", "Optional: MBA for business skills (2 years)", "Gain industry experience (1-3 years)", "Start venture or join startup incubator"]'::jsonb,
+    '["CAT for MBA programs", "University entrance exams", "Incubator selection programs", "No specific entrance exam required", "Focus on building skills and network"]'::jsonb,
+    '{"9th-10th": "Develop problem-solving and leadership skills. Read business books. Start small projects like school events or online sales.", "11th-12th": "Take Commerce with Business Studies. Learn about business models. Consider internships or part-time work to understand business operations."}'::jsonb,
+    '["Business Studies", "Economics"]'::jsonb,
+    '["Mathematics", "Computer Science", "Psychology", "Communication"]'::jsonb
   ) RETURNING id INTO entrepreneur_id;
 
   -- Entrepreneur: Subjects (any stream can work)
@@ -1122,7 +1429,7 @@ BEGIN
     (entrepreneur_id, 'Leadership');
 
   -- Entrepreneur: Job Opportunities
-  INSERT INTO public.career_job_opportunity (careerpath_id, job_title) VALUES
+  INSERT INTO public.career_options (careerpath_id, job_title) VALUES
     (entrepreneur_id, 'Startup Founder'),
     (entrepreneur_id, 'Business Owner'),
     (entrepreneur_id, 'Innovation Manager'),
@@ -1411,6 +1718,443 @@ END $$;
 
 
 -- ================================================================
+-- PART 9: CAREERPATH_COURSES (Career → Course Mappings)
+-- ================================================================
+-- NOTE: Run this AFTER migration 003_restructure_relationships.sql
+
+DO $$
+DECLARE
+  -- Career IDs
+  civil_engineer_id uuid;
+  software_developer_id uuid;
+  data_scientist_id uuid;
+  mechanical_engineer_id uuid;
+  architect_id uuid;
+  doctor_id uuid;
+  nurse_id uuid;
+  physiotherapist_id uuid;
+  marketing_specialist_id uuid;
+  accountant_id uuid;
+  lawyer_id uuid;
+  graphic_designer_id uuid;
+  psychologist_id uuid;
+  teacher_id uuid;
+  entrepreneur_id uuid;
+
+  -- Course IDs
+  btech_cs_id uuid;
+  btech_civil_id uuid;
+  mbbs_id uuid;
+  mba_id uuid;
+  llb_id uuid;
+  bdes_id uuid;
+
+  -- Additional course IDs (to be created)
+  btech_mech_id uuid;
+  barch_id uuid;
+  bsc_nursing_id uuid;
+  bpt_id uuid;
+  bba_id uuid;
+  bcom_id uuid;
+  ba_psychology_id uuid;
+  bed_id uuid;
+
+BEGIN
+  -- Get existing career IDs
+  SELECT id INTO civil_engineer_id FROM public.career_path WHERE slug = 'civil-engineer';
+  SELECT id INTO software_developer_id FROM public.career_path WHERE slug = 'software-developer';
+  SELECT id INTO data_scientist_id FROM public.career_path WHERE slug = 'data-scientist';
+  SELECT id INTO mechanical_engineer_id FROM public.career_path WHERE slug = 'mechanical-engineer';
+  SELECT id INTO architect_id FROM public.career_path WHERE slug = 'architect';
+  SELECT id INTO doctor_id FROM public.career_path WHERE slug = 'doctor';
+  SELECT id INTO nurse_id FROM public.career_path WHERE slug = 'nurse';
+  SELECT id INTO physiotherapist_id FROM public.career_path WHERE slug = 'physiotherapist';
+  SELECT id INTO marketing_specialist_id FROM public.career_path WHERE slug = 'marketing-specialist';
+  SELECT id INTO accountant_id FROM public.career_path WHERE slug = 'accountant';
+  SELECT id INTO lawyer_id FROM public.career_path WHERE slug = 'lawyer';
+  SELECT id INTO graphic_designer_id FROM public.career_path WHERE slug = 'graphic-designer';
+  SELECT id INTO psychologist_id FROM public.career_path WHERE slug = 'psychologist';
+  SELECT id INTO teacher_id FROM public.career_path WHERE slug = 'teacher';
+  SELECT id INTO entrepreneur_id FROM public.career_path WHERE slug = 'entrepreneur';
+
+  -- Get existing course IDs
+  SELECT id INTO btech_cs_id FROM public.course WHERE name = 'B.Tech Computer Science & Engineering';
+  SELECT id INTO btech_civil_id FROM public.course WHERE name = 'B.Tech Civil Engineering';
+  SELECT id INTO mbbs_id FROM public.course WHERE name = 'Bachelor of Medicine, Bachelor of Surgery (MBBS)';
+  SELECT id INTO mba_id FROM public.course WHERE name = 'Master of Business Administration (MBA)';
+  SELECT id INTO llb_id FROM public.course WHERE name = 'B.A. LL.B (Hons.) - Integrated Law Program';
+  SELECT id INTO bdes_id FROM public.course WHERE name = 'Bachelor of Design (B.Des)';
+
+  -- ================================================================
+  -- Create additional courses needed for career mappings
+  -- ================================================================
+
+  -- B.Tech Mechanical Engineering
+  INSERT INTO public.course (name, description, duration) VALUES (
+    'B.Tech Mechanical Engineering',
+    'Four-year undergraduate program in mechanical engineering. Covers thermodynamics, manufacturing, machine design. Hands-on training in workshops and labs. Prepares for manufacturing and automotive careers.',
+    '4 years'
+  ) RETURNING id INTO btech_mech_id;
+
+  -- B.Arch (Architecture)
+  INSERT INTO public.course (name, description, duration) VALUES (
+    'Bachelor of Architecture (B.Arch)',
+    'Five-year undergraduate program in architecture. Covers design principles, construction technology, urban planning. Studio-based learning with industry projects. Required for architecture practice.',
+    '5 years'
+  ) RETURNING id INTO barch_id;
+
+  -- B.Sc Nursing
+  INSERT INTO public.course (name, description, duration) VALUES (
+    'B.Sc Nursing',
+    'Four-year undergraduate nursing program. Covers patient care, medical procedures, community health. Clinical rotations in hospitals. Prepares for nursing careers in healthcare.',
+    '4 years'
+  ) RETURNING id INTO bsc_nursing_id;
+
+  -- BPT (Physiotherapy)
+  INSERT INTO public.course (name, description, duration) VALUES (
+    'Bachelor of Physiotherapy (BPT)',
+    'Four and a half year program including internship. Covers rehabilitation, musculoskeletal therapy, sports medicine. Clinical training in hospitals and rehabilitation centers.',
+    '4.5 years'
+  ) RETURNING id INTO bpt_id;
+
+  -- BBA
+  INSERT INTO public.course (name, description, duration) VALUES (
+    'Bachelor of Business Administration (BBA)',
+    'Three-year undergraduate program in business management. Covers marketing, finance, operations, HR. Industry internships and case studies. Foundation for management careers.',
+    '3 years'
+  ) RETURNING id INTO bba_id;
+
+  -- B.Com
+  INSERT INTO public.course (name, description, duration) VALUES (
+    'Bachelor of Commerce (B.Com)',
+    'Three-year undergraduate program in commerce. Covers accounting, taxation, business law. Foundation for CA, CMA, CS professional courses. Prepares for finance and accounting careers.',
+    '3 years'
+  ) RETURNING id INTO bcom_id;
+
+  -- BA Psychology
+  INSERT INTO public.course (name, description, duration) VALUES (
+    'Bachelor of Arts in Psychology (BA Psychology)',
+    'Three-year undergraduate program in psychology. Covers developmental, clinical, social psychology. Research methodology and counseling basics. Foundation for psychology careers.',
+    '3 years'
+  ) RETURNING id INTO ba_psychology_id;
+
+  -- B.Ed
+  INSERT INTO public.course (name, description, duration) VALUES (
+    'Bachelor of Education (B.Ed)',
+    'Two-year postgraduate program in education. Covers pedagogy, curriculum design, educational psychology. Teaching practice in schools. Required for teaching positions.',
+    '2 years'
+  ) RETURNING id INTO bed_id;
+
+  -- ================================================================
+  -- Link entrance exams to new courses
+  -- ================================================================
+
+  -- Get entrance exam IDs
+  DECLARE
+    jee_exam_id uuid;
+    neet_exam_id uuid;
+    nata_exam_id uuid;
+    cat_exam_id uuid;
+    state_cet_id uuid;
+  BEGIN
+    SELECT id INTO jee_exam_id FROM public.entrance_exam WHERE name = 'JEE Main & Advanced';
+    SELECT id INTO neet_exam_id FROM public.entrance_exam WHERE name = 'NEET UG';
+    SELECT id INTO nata_exam_id FROM public.entrance_exam WHERE name = 'NATA';
+    SELECT id INTO cat_exam_id FROM public.entrance_exam WHERE name = 'CAT';
+    SELECT id INTO state_cet_id FROM public.entrance_exam WHERE name = 'State CET exams';
+
+    -- Link exams to new courses
+    INSERT INTO public.course_entrance_exams (course_id, entranceexam_id) VALUES
+      (btech_mech_id, jee_exam_id),
+      (barch_id, nata_exam_id),
+      (bsc_nursing_id, neet_exam_id),
+      (bpt_id, neet_exam_id),
+      (bba_id, state_cet_id),
+      (bcom_id, state_cet_id),
+      (ba_psychology_id, state_cet_id),
+      (bed_id, state_cet_id);
+  END;
+
+  -- ================================================================
+  -- Insert careerpath_courses mappings
+  -- ================================================================
+
+  -- Civil Engineer courses
+  IF civil_engineer_id IS NOT NULL AND btech_civil_id IS NOT NULL THEN
+    INSERT INTO public.careerpath_courses (careerpath_id, course_id, is_primary, notes) VALUES
+      (civil_engineer_id, btech_civil_id, true, 'Primary undergraduate degree for civil engineering');
+  END IF;
+
+  -- Software Developer courses
+  IF software_developer_id IS NOT NULL AND btech_cs_id IS NOT NULL THEN
+    INSERT INTO public.careerpath_courses (careerpath_id, course_id, is_primary, notes) VALUES
+      (software_developer_id, btech_cs_id, true, 'Primary degree for software development careers');
+  END IF;
+
+  -- Data Scientist courses
+  IF data_scientist_id IS NOT NULL AND btech_cs_id IS NOT NULL THEN
+    INSERT INTO public.careerpath_courses (careerpath_id, course_id, is_primary, notes) VALUES
+      (data_scientist_id, btech_cs_id, true, 'Strong foundation for data science careers');
+  END IF;
+
+  -- Mechanical Engineer courses
+  IF mechanical_engineer_id IS NOT NULL AND btech_mech_id IS NOT NULL THEN
+    INSERT INTO public.careerpath_courses (careerpath_id, course_id, is_primary, notes) VALUES
+      (mechanical_engineer_id, btech_mech_id, true, 'Primary undergraduate degree for mechanical engineering');
+  END IF;
+
+  -- Architect courses
+  IF architect_id IS NOT NULL AND barch_id IS NOT NULL THEN
+    INSERT INTO public.careerpath_courses (careerpath_id, course_id, is_primary, notes) VALUES
+      (architect_id, barch_id, true, 'Required degree for architecture practice');
+  END IF;
+
+  -- Doctor courses
+  IF doctor_id IS NOT NULL AND mbbs_id IS NOT NULL THEN
+    INSERT INTO public.careerpath_courses (careerpath_id, course_id, is_primary, notes) VALUES
+      (doctor_id, mbbs_id, true, 'Primary medical degree required for doctors');
+  END IF;
+
+  -- Nurse courses
+  IF nurse_id IS NOT NULL AND bsc_nursing_id IS NOT NULL THEN
+    INSERT INTO public.careerpath_courses (careerpath_id, course_id, is_primary, notes) VALUES
+      (nurse_id, bsc_nursing_id, true, 'Primary nursing degree');
+  END IF;
+
+  -- Physiotherapist courses
+  IF physiotherapist_id IS NOT NULL AND bpt_id IS NOT NULL THEN
+    INSERT INTO public.careerpath_courses (careerpath_id, course_id, is_primary, notes) VALUES
+      (physiotherapist_id, bpt_id, true, 'Required degree for physiotherapy practice');
+  END IF;
+
+  -- Marketing Specialist courses
+  IF marketing_specialist_id IS NOT NULL AND bba_id IS NOT NULL THEN
+    INSERT INTO public.careerpath_courses (careerpath_id, course_id, is_primary, notes) VALUES
+      (marketing_specialist_id, bba_id, true, 'Foundation for marketing careers');
+  END IF;
+  IF marketing_specialist_id IS NOT NULL AND mba_id IS NOT NULL THEN
+    INSERT INTO public.careerpath_courses (careerpath_id, course_id, is_primary, notes) VALUES
+      (marketing_specialist_id, mba_id, false, 'Advanced degree for senior marketing roles');
+  END IF;
+
+  -- Accountant courses
+  IF accountant_id IS NOT NULL AND bcom_id IS NOT NULL THEN
+    INSERT INTO public.careerpath_courses (careerpath_id, course_id, is_primary, notes) VALUES
+      (accountant_id, bcom_id, true, 'Primary degree for accounting careers');
+  END IF;
+
+  -- Lawyer courses
+  IF lawyer_id IS NOT NULL AND llb_id IS NOT NULL THEN
+    INSERT INTO public.careerpath_courses (careerpath_id, course_id, is_primary, notes) VALUES
+      (lawyer_id, llb_id, true, 'Integrated law program for legal careers');
+  END IF;
+
+  -- Graphic Designer courses
+  IF graphic_designer_id IS NOT NULL AND bdes_id IS NOT NULL THEN
+    INSERT INTO public.careerpath_courses (careerpath_id, course_id, is_primary, notes) VALUES
+      (graphic_designer_id, bdes_id, true, 'Primary design degree');
+  END IF;
+
+  -- Psychologist courses
+  IF psychologist_id IS NOT NULL AND ba_psychology_id IS NOT NULL THEN
+    INSERT INTO public.careerpath_courses (careerpath_id, course_id, is_primary, notes) VALUES
+      (psychologist_id, ba_psychology_id, true, 'Foundation for psychology careers');
+  END IF;
+
+  -- Teacher courses
+  IF teacher_id IS NOT NULL AND bed_id IS NOT NULL THEN
+    INSERT INTO public.careerpath_courses (careerpath_id, course_id, is_primary, notes) VALUES
+      (teacher_id, bed_id, true, 'Required for teaching positions');
+  END IF;
+
+  -- Entrepreneur courses
+  IF entrepreneur_id IS NOT NULL AND bba_id IS NOT NULL THEN
+    INSERT INTO public.careerpath_courses (careerpath_id, course_id, is_primary, notes) VALUES
+      (entrepreneur_id, bba_id, true, 'Business foundation for entrepreneurs');
+  END IF;
+  IF entrepreneur_id IS NOT NULL AND mba_id IS NOT NULL THEN
+    INSERT INTO public.careerpath_courses (careerpath_id, course_id, is_primary, notes) VALUES
+      (entrepreneur_id, mba_id, false, 'Advanced business education');
+  END IF;
+
+END $$;
+
+
+-- ================================================================
+-- PART 10: COLLEGE_COURSES (College → Course Mappings)
+-- ================================================================
+
+DO $$
+DECLARE
+  -- College IDs
+  iit_delhi_id uuid;
+  nitk_id uuid;
+  aiims_id uuid;
+  iimb_id uuid;
+  nlsiu_id uuid;
+  nid_id uuid;
+  manipal_id uuid;
+  christ_id uuid;
+
+  -- Course IDs
+  btech_cs_id uuid;
+  btech_civil_id uuid;
+  btech_mech_id uuid;
+  mbbs_id uuid;
+  mba_id uuid;
+  llb_id uuid;
+  bdes_id uuid;
+  barch_id uuid;
+  bsc_nursing_id uuid;
+  bba_id uuid;
+  bcom_id uuid;
+  ba_psychology_id uuid;
+
+BEGIN
+  -- Get college IDs
+  SELECT id INTO iit_delhi_id FROM public.college WHERE name = 'Indian Institute of Technology Delhi';
+  SELECT id INTO nitk_id FROM public.college WHERE name = 'National Institute of Technology Karnataka';
+  SELECT id INTO aiims_id FROM public.college WHERE name = 'All India Institute of Medical Sciences Delhi';
+  SELECT id INTO iimb_id FROM public.college WHERE name = 'Indian Institute of Management Bangalore';
+  SELECT id INTO nlsiu_id FROM public.college WHERE name = 'National Law School of India University';
+  SELECT id INTO nid_id FROM public.college WHERE name = 'National Institute of Design Ahmedabad';
+  SELECT id INTO manipal_id FROM public.college WHERE name = 'Manipal Academy of Higher Education';
+  SELECT id INTO christ_id FROM public.college WHERE name = 'Christ University Bangalore';
+
+  -- Get course IDs
+  SELECT id INTO btech_cs_id FROM public.course WHERE name = 'B.Tech Computer Science & Engineering';
+  SELECT id INTO btech_civil_id FROM public.course WHERE name = 'B.Tech Civil Engineering';
+  SELECT id INTO btech_mech_id FROM public.course WHERE name = 'B.Tech Mechanical Engineering';
+  SELECT id INTO mbbs_id FROM public.course WHERE name = 'Bachelor of Medicine, Bachelor of Surgery (MBBS)';
+  SELECT id INTO mba_id FROM public.course WHERE name = 'Master of Business Administration (MBA)';
+  SELECT id INTO llb_id FROM public.course WHERE name = 'B.A. LL.B (Hons.) - Integrated Law Program';
+  SELECT id INTO bdes_id FROM public.course WHERE name = 'Bachelor of Design (B.Des)';
+  SELECT id INTO barch_id FROM public.course WHERE name = 'Bachelor of Architecture (B.Arch)';
+  SELECT id INTO bsc_nursing_id FROM public.course WHERE name = 'B.Sc Nursing';
+  SELECT id INTO bba_id FROM public.course WHERE name = 'Bachelor of Business Administration (BBA)';
+  SELECT id INTO bcom_id FROM public.course WHERE name = 'Bachelor of Commerce (B.Com)';
+  SELECT id INTO ba_psychology_id FROM public.course WHERE name = 'Bachelor of Arts in Psychology (BA Psychology)';
+
+  -- ================================================================
+  -- IIT Delhi courses
+  -- ================================================================
+  IF iit_delhi_id IS NOT NULL THEN
+    IF btech_cs_id IS NOT NULL THEN
+      INSERT INTO public.college_courses (college_id, course_id, annual_fees, total_fees, seats, admission_process) VALUES
+        (iit_delhi_id, btech_cs_id, '₹2.2 Lakhs/year', '₹8.8 Lakhs total', '85', 'JEE Advanced rank-based counseling through JoSAA');
+    END IF;
+    IF btech_civil_id IS NOT NULL THEN
+      INSERT INTO public.college_courses (college_id, course_id, annual_fees, total_fees, seats, admission_process) VALUES
+        (iit_delhi_id, btech_civil_id, '₹2.2 Lakhs/year', '₹8.8 Lakhs total', '70', 'JEE Advanced rank-based counseling through JoSAA');
+    END IF;
+    IF btech_mech_id IS NOT NULL THEN
+      INSERT INTO public.college_courses (college_id, course_id, annual_fees, total_fees, seats, admission_process) VALUES
+        (iit_delhi_id, btech_mech_id, '₹2.2 Lakhs/year', '₹8.8 Lakhs total', '75', 'JEE Advanced rank-based counseling through JoSAA');
+    END IF;
+  END IF;
+
+  -- ================================================================
+  -- NIT Karnataka courses
+  -- ================================================================
+  IF nitk_id IS NOT NULL THEN
+    IF btech_cs_id IS NOT NULL THEN
+      INSERT INTO public.college_courses (college_id, course_id, annual_fees, total_fees, seats, admission_process) VALUES
+        (nitk_id, btech_cs_id, '₹1.5 Lakhs/year', '₹6 Lakhs total', '180', 'JEE Main rank-based counseling through JoSAA/CSAB');
+    END IF;
+    IF btech_civil_id IS NOT NULL THEN
+      INSERT INTO public.college_courses (college_id, course_id, annual_fees, total_fees, seats, admission_process) VALUES
+        (nitk_id, btech_civil_id, '₹1.5 Lakhs/year', '₹6 Lakhs total', '120', 'JEE Main rank-based counseling through JoSAA/CSAB');
+    END IF;
+    IF btech_mech_id IS NOT NULL THEN
+      INSERT INTO public.college_courses (college_id, course_id, annual_fees, total_fees, seats, admission_process) VALUES
+        (nitk_id, btech_mech_id, '₹1.5 Lakhs/year', '₹6 Lakhs total', '140', 'JEE Main rank-based counseling through JoSAA/CSAB');
+    END IF;
+    IF barch_id IS NOT NULL THEN
+      INSERT INTO public.college_courses (college_id, course_id, annual_fees, total_fees, seats, admission_process) VALUES
+        (nitk_id, barch_id, '₹1.5 Lakhs/year', '₹7.5 Lakhs total', '40', 'JEE Main Paper 2 + NATA score based admission');
+    END IF;
+  END IF;
+
+  -- ================================================================
+  -- AIIMS Delhi courses
+  -- ================================================================
+  IF aiims_id IS NOT NULL AND mbbs_id IS NOT NULL THEN
+    INSERT INTO public.college_courses (college_id, course_id, annual_fees, total_fees, seats, admission_process) VALUES
+      (aiims_id, mbbs_id, '₹1,628/year', '₹8,968 total', '100', 'NEET UG All India Rank based counseling through MCC');
+  END IF;
+  IF aiims_id IS NOT NULL AND bsc_nursing_id IS NOT NULL THEN
+    INSERT INTO public.college_courses (college_id, course_id, annual_fees, total_fees, seats, admission_process) VALUES
+      (aiims_id, bsc_nursing_id, '₹1,000/year', '₹4,000 total', '60', 'AIIMS Nursing Entrance Exam');
+  END IF;
+
+  -- ================================================================
+  -- IIM Bangalore courses
+  -- ================================================================
+  IF iimb_id IS NOT NULL AND mba_id IS NOT NULL THEN
+    INSERT INTO public.college_courses (college_id, course_id, annual_fees, total_fees, seats, admission_process) VALUES
+      (iimb_id, mba_id, '₹12 Lakhs/year', '₹24 Lakhs total', '450', 'CAT score + WAT + Personal Interview');
+  END IF;
+
+  -- ================================================================
+  -- NLSIU courses
+  -- ================================================================
+  IF nlsiu_id IS NOT NULL AND llb_id IS NOT NULL THEN
+    INSERT INTO public.college_courses (college_id, course_id, annual_fees, total_fees, seats, admission_process) VALUES
+      (nlsiu_id, llb_id, '₹2.5 Lakhs/year', '₹12.5 Lakhs total', '120', 'CLAT rank-based admission');
+  END IF;
+
+  -- ================================================================
+  -- NID Ahmedabad courses
+  -- ================================================================
+  IF nid_id IS NOT NULL AND bdes_id IS NOT NULL THEN
+    INSERT INTO public.college_courses (college_id, course_id, annual_fees, total_fees, seats, admission_process) VALUES
+      (nid_id, bdes_id, '₹3.5 Lakhs/year', '₹14 Lakhs total', '100', 'NID DAT Prelims + Mains + Studio Test + Interview');
+  END IF;
+
+  -- ================================================================
+  -- Manipal University courses
+  -- ================================================================
+  IF manipal_id IS NOT NULL THEN
+    IF btech_cs_id IS NOT NULL THEN
+      INSERT INTO public.college_courses (college_id, course_id, annual_fees, total_fees, seats, admission_process) VALUES
+        (manipal_id, btech_cs_id, '₹4.5 Lakhs/year', '₹18 Lakhs total', '300', 'MET (Manipal Entrance Test) based admission');
+    END IF;
+    IF mbbs_id IS NOT NULL THEN
+      INSERT INTO public.college_courses (college_id, course_id, annual_fees, total_fees, seats, admission_process) VALUES
+        (manipal_id, mbbs_id, '₹10 Lakhs/year', '₹55 Lakhs total', '250', 'NEET UG score + Manipal counseling');
+    END IF;
+    IF bba_id IS NOT NULL THEN
+      INSERT INTO public.college_courses (college_id, course_id, annual_fees, total_fees, seats, admission_process) VALUES
+        (manipal_id, bba_id, '₹3.5 Lakhs/year', '₹10.5 Lakhs total', '200', 'MUOET based admission');
+    END IF;
+  END IF;
+
+  -- ================================================================
+  -- Christ University courses
+  -- ================================================================
+  IF christ_id IS NOT NULL THEN
+    IF bba_id IS NOT NULL THEN
+      INSERT INTO public.college_courses (college_id, course_id, annual_fees, total_fees, seats, admission_process) VALUES
+        (christ_id, bba_id, '₹2.8 Lakhs/year', '₹8.4 Lakhs total', '300', 'Christ University Entrance Test + Interview');
+    END IF;
+    IF bcom_id IS NOT NULL THEN
+      INSERT INTO public.college_courses (college_id, course_id, annual_fees, total_fees, seats, admission_process) VALUES
+        (christ_id, bcom_id, '₹1.5 Lakhs/year', '₹4.5 Lakhs total', '400', 'Christ University Entrance Test + Interview');
+    END IF;
+    IF ba_psychology_id IS NOT NULL THEN
+      INSERT INTO public.college_courses (college_id, course_id, annual_fees, total_fees, seats, admission_process) VALUES
+        (christ_id, ba_psychology_id, '₹1.8 Lakhs/year', '₹5.4 Lakhs total', '120', 'Christ University Entrance Test + Interview');
+    END IF;
+    IF llb_id IS NOT NULL THEN
+      INSERT INTO public.college_courses (college_id, course_id, annual_fees, total_fees, seats, admission_process) VALUES
+        (christ_id, llb_id, '₹2.5 Lakhs/year', '₹12.5 Lakhs total', '100', 'CLAT score or Christ Law Entrance + Interview');
+    END IF;
+  END IF;
+
+END $$;
+
+
+-- ================================================================
 -- DATA POPULATION COMPLETE
 -- ================================================================
 -- Summary:
@@ -1421,5 +2165,7 @@ END $$;
 -- - 8 Entrance Exams
 -- - 15 Comprehensive Careers with full relationship data
 -- - 8 Top Colleges (Mix of govt and private)
--- - 6 Major Courses with entrance exam and skill linkages
+-- - 14 Courses with entrance exam and skill linkages
+-- - Career to Course mappings (careerpath_courses)
+-- - College to Course mappings (college_courses)
 -- ================================================================
