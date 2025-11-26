@@ -125,10 +125,11 @@ export async function fetchCareerTags(careerPathId: string) {
 
 /**
  * Fetch job opportunities for a career
+ * Uses the renamed career_options table (formerly career_job_opportunity)
  */
 export async function fetchJobOpportunities(careerPathId: string) {
   const { data, error } = await supabase
-    .from('career_job_opportunity')
+    .from('career_options')
     .select('*')
     .eq('careerpath_id', careerPathId);
 

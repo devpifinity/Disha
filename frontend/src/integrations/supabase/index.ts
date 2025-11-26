@@ -63,13 +63,15 @@ export interface Skill {
 export interface College {
   id: string;
   name: string;
-  description: string[]; // TEXT[] array
-  location: string;
+  description: string; // TEXT field (not array)
   address: string;
+  city: string;
+  state: string;
+  zip_code: string;
   website: string;
   email: string;
   phone: string;
-  scholarshipDetails: string[]; // TEXT[] array
+  scholarshipdetails: string; // TEXT field (not array) - PostgreSQL lowercase
   rating: number; // numeric(2,1)
   type: 'govt' | 'private'; // enum type_of_college
   created_at: string;
@@ -78,8 +80,11 @@ export interface College {
 export interface Course {
   id: string;
   name: string;
-  description: string[]; // TEXT[] array
+  description: string; // TEXT field (not array)
   duration: string;
+  degree_level?: string;
+  seats?: number; // numeric(2,1)
+  annual_fees?: string;
   created_at: string;
 }
 
@@ -130,6 +135,13 @@ export interface CareerJobOpportunity {
   job_title: string;
 }
 
+// Renamed from CareerJobOpportunity - same structure, new name
+export interface CareerOption {
+  id: string;
+  careerpath_id: string;
+  job_title: string;
+}
+
 export interface CourseSkill {
   id: string;
   course_id: string;
@@ -137,6 +149,7 @@ export interface CourseSkill {
   skill?: Skill; // Joined data
 }
 
+// DEPRECATED: Use CareerPathCourse and CollegeCourse instead
 export interface CollegeCourseJob {
   id: string;
   job_id: string;
@@ -146,6 +159,34 @@ export interface CollegeCourseJob {
   college?: College;
   course?: Course;
   career_job_opportunity?: CareerJobOpportunity;
+}
+
+// NEW: Links career paths to their relevant courses
+export interface CareerPathCourse {
+  id: string;
+  careerpath_id: string;
+  course_id: string;
+  is_primary: boolean;
+  notes?: string;
+  created_at: string;
+  // Joined data
+  course?: Course;
+}
+
+// NEW: Links colleges to the courses they offer
+export interface CollegeCourse {
+  id: string;
+  college_id: string;
+  course_id: string;
+  annual_fees?: string;
+  total_fees?: string;
+  seats?: string;
+  duration_override?: string;
+  admission_process?: string;
+  created_at: string;
+  // Joined data
+  college?: College;
+  course?: Course;
 }
 
 export interface CourseEntranceExam {
@@ -166,6 +207,19 @@ export interface CareerPathWithRelations extends CareerPath {
   skills?: CareerPathSkill[];
   tags?: CareerPathTag[];
   job_opportunities?: CareerJobOpportunity[];
+  career_options?: CareerOption[]; // New name for job opportunities
+  courses?: CareerPathCourse[]; // NEW: courses for this career
   stream?: Stream;
   cluster?: CareerCluster;
+}
+
+// NEW: College with all courses it offers
+export interface CollegeWithCourses {
+  college: College;
+  courses: (Course & {
+    annual_fees?: string;
+    total_fees?: string;
+    seats?: string;
+    admission_process?: string;
+  })[];
 }
