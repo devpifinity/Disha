@@ -12,7 +12,7 @@
       "college_id": "NjE1Mzcx",
       "courses": [
         {
-          "name": "B.Tech. in Electronics and Commu",
+          "name": "B.Tech. in Electronics and Communication Engineering",
           "annual_fees": "16900",
           "duration": "4 years",
           "degree_level": "UG Degree",
@@ -254,7 +254,7 @@
       "college_id": "NTk3MjA1",
       "courses": [
         {
-          "name": "B.Tech. in Computer Science and",
+          "name": "B.Tech. in Computer Science and Engineering",
           "annual_fees": "800000",
           "duration": "4 years",
           "degree_level": "UG Degree",
@@ -265,7 +265,7 @@
         },
         {
           "name": "B.Tech. in Petroleum Engineering",
-          "annual_fees": "800000",
+          "annual_fees": "",
           "duration": "4 years",
           "degree_level": "UG Degree",
           "entrance_exams": [
@@ -932,7 +932,7 @@
       "college_id": "MzU4MzM4",
       "courses": [
         {
-          "name": "B.Tech. in Mechanical Engineerin",
+          "name": "B.Tech. in Mechanical Engineering",
           "annual_fees": "276800",
           "duration": "4 years",
           "degree_level": "UG Degree",
@@ -1011,7 +1011,7 @@
       "college_id": "MzA4OTA1",
       "courses": [
         {
-          "name": "B.Tech. in Electrical Engineerin",
+          "name": "B.Tech. in Electrical Engineering",
           "annual_fees": "229000",
           "duration": "4 years",
           "degree_level": "UG Degree",

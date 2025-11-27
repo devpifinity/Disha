@@ -66,7 +66,8 @@ def deduplicate_colleges(colleges: List[Dict]) -> List[Dict]:
     seen = {}
     
     for college in colleges:
-        college_name = college.get('College Name', '').strip().lower()
+        # Handle both old format ("College Name") and new format ("name")
+        college_name = college.get('College Name', college.get('name', '')).strip().lower()
         
         if not college_name:
             continue
@@ -348,7 +349,7 @@ def save_data(
     specialization: Optional[str] = None,
     location: Optional[str] = None,
     university: Optional[str] = None
-):
+ ):
     """
     Save data in multiple formats
     

@@ -1,5 +1,6 @@
 import time
 import re
+import base64
 from typing import List, Dict, Optional, Set
 from playwright.sync_api import sync_playwright, Page, Locator, Browser, BrowserContext, Playwright
 from src.utils import clean_text, append_to_csv, append_to_jsonl
@@ -69,21 +70,46 @@ class PlaywrightScraper:
     def _extract_courses_via_dom(self, card: Locator, page: Page) -> List[Dict]:
         courses = []
         btn = card.locator("button.dropdown-toggle").first
+        dropdown_locator = card.locator("ul.dropdown-menu.courses-dropdown").first
 
-        if btn.count() == 0 or not btn.is_visible():
-            logger.warning("  Course dropdown toggle missing; returning currently visible course only (if any).")
-        else:
+        # 1. Get the "Current" (Selected) Course
+        # The button text is often truncated (e.g. "B.Tech. in Electrical Engineerin...")
+        # The full text is usually in the first <li> of the dropdown that is NOT an input.
+        # This <li> often has style="cursor: not-allowed;" because it's selected.
+        current_course_name = ""
+        try:
+            # Strategy 1: Look for <li> with cursor: not-allowed (explicitly selected item)
+            selected_li = dropdown_locator.locator("li[style*='cursor: not-allowed']").first
+            if selected_li.count() > 0:
+                current_course_name = selected_li.text_content().strip()
+            
+            # Strategy 2: If not found, look for <li> that is not input and has no data-search
+            if not current_course_name:
+                selected_li = dropdown_locator.locator("li").filter(has_not=dropdown_locator.locator("input")).filter(has_not=dropdown_locator.locator("[data-search]")).first
+                if selected_li.count() > 0:
+                    current_course_name = selected_li.text_content().strip()
+            
+            if current_course_name:
+                current_course_name = re.sub(r'\s+', ' ', current_course_name)
+        except Exception as e:
+            logger.warning(f"  Failed to extract current course from hidden LI: {e}")
+
+        # Fallback to button if we couldn't find it in the list
+        if not current_course_name:
+            if btn.count() > 0:
+                current_course_name = btn.get_attribute("title") or btn.text_content()
+                current_course_name = re.sub(r'\s+', ' ', current_course_name.strip()).strip()
+        
+        if current_course_name:
             try:
-                current_course_name = re.sub(r'\s+', ' ', btn.text_content().strip()).strip()
                 current_details = self._extract_course_details_from_card(card)
                 ordered_details = {"Course Name": current_course_name}
                 ordered_details.update(current_details)
                 courses.append(ordered_details)
             except Exception as e:
-                logger.warning(f"  Failed to read current course from card: {e}")
+                logger.warning(f"  Failed to read details for current course: {e}")
 
-        dropdown_locator = card.locator("ul.dropdown-menu.courses-dropdown").first
-
+        # 2. Iterate over the other courses in the dropdown
         def ensure_dropdown_visible() -> bool:
             for _ in range(3):
                 if dropdown_locator.is_visible():
@@ -105,7 +131,26 @@ class PlaywrightScraper:
                             raise RuntimeError("Dropdown not visible")
 
                         item = dropdown_locator.locator("li[data-search]").nth(idx)
-                        course_name = re.sub(r'\s+', ' ', item.text_content(timeout=2000).strip())
+                        
+                        # Strategy 1: Base64 decode 'data-of' attribute (Most reliable)
+                        data_of = item.get_attribute("data-of")
+                        course_name = ""
+                        if data_of:
+                            try:
+                                course_name = base64.b64decode(data_of).decode('utf-8').strip()
+                            except Exception:
+                                pass
+                        
+                        # Strategy 2: Title attribute
+                        if not course_name:
+                            course_name = item.get_attribute("title")
+                        
+                        # Strategy 3: Text content
+                        if not course_name:
+                            course_name = item.text_content(timeout=2000)
+
+                        course_name = re.sub(r'\s+', ' ', course_name.strip())
+                        
                         item.click(timeout=2000)
                         page.wait_for_timeout(200)
 

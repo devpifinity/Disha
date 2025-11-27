@@ -4,12 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  ArrowLeft, 
-  MapPin, 
-  Users, 
-  Star, 
-  ExternalLink, 
+import {
+  ArrowLeft,
+  MapPin,
+  Users,
+  Star,
+  ExternalLink,
   GraduationCap,
   DollarSign,
   Calendar,
@@ -24,6 +24,41 @@ import {
   HandHeart
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { saveCollege, unsaveCollege, isCollegeSaved } from "@/lib/userProfileStorage";
+import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase";
+import { fetchCareerBySlug } from "@/lib/careerQueries";
+import { fetchCollegesWithCoursesForCareer, fetchUniqueEntranceExamsForCareer } from "@/lib/collegeQueries";
+
+// Type for college data
+interface CollegeData {
+  name: string;
+  location: string;
+  type: string;
+  rating: number;
+  fees: string;
+  originalFees: string;
+  duration: string;
+  seats: string;
+  financialAid: string[];
+  highlights: string[];
+  contact: {
+    phone: string;
+    email: string;
+  };
+  hasUnderservedScholarships?: boolean;
+  scholarshipDetails?: string;
+  courses?: Array<{
+    name: string;
+    description: string;
+    annual_fees?: string;
+    total_fees?: string;
+    seats?: string;
+    admission_process?: string;
+  }>;
+}
 
 // Entrance exam data for select colleges (demo phase - limited scope)
 const collegeEntranceExams = {
@@ -1218,8 +1253,125 @@ const affordableScholarshipsData = [
 const CollegesScholarships = () => {
   const { careerSlug } = useParams<{ careerSlug: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [savedColleges, setSavedColleges] = useState<Set<string>>(new Set());
 
-  const colleges = governmentCollegesData[careerSlug as keyof typeof governmentCollegesData] || [];
+  // Fetch career ID from database
+  const { data: careerData } = useQuery({
+    queryKey: ['career-for-colleges', careerSlug],
+    queryFn: async () => {
+      if (!careerSlug) return null;
+      const result = await fetchCareerBySlug(careerSlug);
+      return result.data;
+    },
+    enabled: !!careerSlug
+  });
+
+  // Fetch colleges from database
+  const { data: dbColleges, isLoading: collegesLoading, error: collegesError } = useQuery({
+    queryKey: ['colleges', careerData?.id],
+    queryFn: async () => {
+      if (!careerData?.id) return null;
+      console.log('🔍 Fetching colleges for career ID:', careerData.id);
+      const result = await fetchCollegesWithCoursesForCareer(careerData.id);
+      console.log('✅ Colleges fetched from DB:', result.data);
+      return result.data;
+    },
+    enabled: !!careerData?.id
+  });
+
+  // Fetch entrance exams from database
+  const { data: dbExams, isLoading: examsLoading } = useQuery({
+    queryKey: ['exams', careerData?.id],
+    queryFn: async () => {
+      if (!careerData?.id) return null;
+      console.log('🔍 Fetching entrance exams for career ID:', careerData.id);
+      const result = await fetchUniqueEntranceExamsForCareer(careerData.id);
+      console.log('✅ Entrance exams fetched from DB:', result.data);
+      return result.data;
+    },
+    enabled: !!careerData?.id
+  });
+
+  // Transform database colleges to display format
+  const colleges = dbColleges?.map(({ college, courses }) => {
+    // Get fee information from the first course (college_courses has fees)
+    const primaryCourse = courses[0];
+
+    return {
+      name: college.name,
+      location: `${college.city}, ${college.state}`,
+      type: college.type === 'govt' ? 'Government' : 'Private',
+      rating: college.rating || 4.0,
+      fees: primaryCourse?.annual_fees || "Contact college for fee details",
+      originalFees: primaryCourse?.total_fees || "Contact college for total fees",
+      duration: primaryCourse?.duration || "Contact college",
+      seats: primaryCourse?.seats || "Contact college",
+      financialAid: college.scholarshipdetails
+        ? college.scholarshipdetails.split('|').filter(Boolean)
+        : ["Contact college for scholarship information"],
+      highlights: college.description
+        ? college.description.split('|').filter(Boolean)
+        : ["Quality Education"],
+      contact: {
+        phone: college.phone || "Not available",
+        email: college.email || "Not available"
+      },
+      hasUnderservedScholarships: !!college.scholarshipdetails,
+      scholarshipDetails: college.scholarshipdetails || undefined,
+      courses: courses.map(c => ({
+        name: c.name,
+        description: c.description,
+        annual_fees: c.annual_fees,
+        total_fees: c.total_fees,
+        seats: c.seats,
+        admission_process: c.admission_process
+      }))
+    };
+  }) || [];
+
+  // Initialize saved colleges from localStorage
+  useEffect(() => {
+    if (!dbColleges) return;
+
+    const saved = new Set<string>();
+    dbColleges.forEach(({ college }) => {
+      if (isCollegeSaved(college.name, careerSlug || '')) {
+        saved.add(college.name);
+      }
+    });
+    setSavedColleges(saved);
+  }, [careerSlug, dbColleges]);
+
+  const handleSaveCollege = (college: CollegeData) => {
+    const collegeKey = college.name;
+    
+    if (savedColleges.has(collegeKey)) {
+      unsaveCollege(college.name, careerSlug || '');
+      setSavedColleges(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(collegeKey);
+        return newSet;
+      });
+      toast({
+        title: "College removed",
+        description: "The college has been removed from your profile.",
+      });
+    } else {
+      saveCollege({
+        name: college.name,
+        location: college.location,
+        type: college.type,
+        fees: college.fees,
+        career: careerSlug || '',
+      });
+      setSavedColleges(prev => new Set(prev).add(collegeKey));
+      toast({
+        title: "College saved!",
+        description: "The college has been added to your profile.",
+      });
+    }
+  };
 
   const careerTitles = {
     "civil-engineer": "Civil Engineering",
@@ -1340,13 +1492,37 @@ const CollegesScholarships = () => {
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {colleges.map((college, index) => (
+            {collegesLoading ? (
+              <div className="text-center py-12">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <p className="mt-4 text-gray-600">Loading colleges...</p>
+              </div>
+            ) : collegesError ? (
+              <div className="text-center py-12">
+                <p className="text-red-600 mb-2">Error loading colleges from database</p>
+                <p className="text-sm text-gray-600">Please try refreshing the page</p>
+              </div>
+            ) : colleges.length === 0 ? (
+              <div className="text-center py-12 bg-yellow-50 rounded-lg border border-yellow-200">
+                <Building className="w-16 h-16 text-yellow-600 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  No Colleges Found
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  We're still populating college data for {currentCareerTitle}.
+                </p>
+                <p className="text-sm text-gray-500">
+                  Please check back soon or contact support for more information.
+                </p>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {colleges.map((college, index) => (
                 <Card key={index} className={`shadow-lg hover:shadow-xl transition-shadow border-l-4 ${
                   college.type === 'Government' ? 'border-l-green-500' : 'border-l-blue-500'
                 }`}>
                   <CardHeader>
-                    <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-start mb-2">
                       <div className="flex items-center gap-2">
                         <Badge className={`${
                           college.type === 'Government' 
@@ -1366,15 +1542,11 @@ const CollegesScholarships = () => {
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-xs z-[9999] bg-gray-900 text-white p-3 rounded-lg shadow-xl border border-gray-700">
                               <p className="text-sm font-medium">
-                                {(college as any).scholarshipDetails || "Financial aid and scholarships available for underserved students"}
+                                {college.scholarshipDetails || "Financial aid and scholarships available for underserved students"}
                               </p>
                             </TooltipContent>
                           </Tooltip>
                         )}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                        <span className="text-sm font-medium">{college.rating}</span>
                       </div>
                     </div>
                     <CardTitle className="text-lg">{college.name}</CardTitle>
@@ -1393,14 +1565,6 @@ const CollegesScholarships = () => {
                       <p className="text-xs text-blue-600">Total Course: {college.originalFees}</p>
                     </div>
 
-                    {/* Financial Aid Tags */}
-                    <div>
-                      <p className="text-sm font-medium text-gray-700 mb-2">Financial Support Available</p>
-                      <div className="flex flex-wrap gap-1">
-                        {college.financialAid.map((aid, idx) => renderFinancialAidBadge(aid, idx))}
-                      </div>
-                    </div>
-
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <p className="text-gray-600">Duration</p>
@@ -1412,17 +1576,20 @@ const CollegesScholarships = () => {
                       </div>
                     </div>
 
-                    <div>
-                      <p className="text-sm font-medium text-gray-700 mb-2">Entrance Exams</p>
-                      <div className="space-y-1">
-                        {collegeEntranceExams[careerSlug as keyof typeof collegeEntranceExams]?.[college.name]?.requiredExams?.map((exam, idx) => (
-                          <div key={idx} className="flex items-center gap-2 text-sm">
-                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
-                            <span>{exam}</span>
-                          </div>
-                        ))}
+                    {dbExams && dbExams.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 mb-2">Entrance Exams</p>
+                        <div className="space-y-1">
+                          {dbExams.map((exam, idx) => (
+                            <div key={idx} className="flex items-center gap-2 text-sm">
+                              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                              <span>{exam.name}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
+
 
                     <div className="space-y-2 pt-4 border-t">
                       <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -1435,25 +1602,37 @@ const CollegesScholarships = () => {
                       </div>
                     </div>
 
-
-                     <Button className="w-full mt-4 bg-green-600 hover:bg-green-700">
-                      Apply Now
-                    </Button>
+                    <div className="flex gap-2 mt-4">
+                      <Button 
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => handleSaveCollege(college)}
+                      >
+                        <Heart className={`w-4 h-4 mr-2 ${savedColleges.has(college.name) ? 'fill-red-500 text-red-500' : ''}`} />
+                        {savedColleges.has(college.name) ? 'Saved' : 'Save'}
+                      </Button>
+                      <Button className="flex-1 bg-green-600 hover:bg-green-700">
+                        Apply Now
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
 
-            {/* View More Colleges Button */}
-            <div className="text-center mt-8">
-              <Button variant="outline" size="lg" className="px-8 py-3">
-                <Building className="w-4 h-4 mr-2" />
-                View More Government Colleges
-              </Button>
-              <p className="text-sm text-gray-600 mt-2">
-                Discover additional affordable options in your state
-              </p>
-            </div>
+            {/* View More Colleges Button - Only show if colleges exist */}
+            {colleges.length > 0 && (
+              <div className="text-center mt-8">
+                <Button variant="outline" size="lg" className="px-8 py-3">
+                  <Building className="w-4 h-4 mr-2" />
+                  View More Government Colleges
+                </Button>
+                <p className="text-sm text-gray-600 mt-2">
+                  Discover additional affordable options in your state
+                </p>
+              </div>
+            )}
           </TabsContent>
 
           {/* Financial Aid & Scholarships Tab */}

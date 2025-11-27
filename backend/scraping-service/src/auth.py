@@ -80,6 +80,8 @@ def create_driver(headless=False):
     """Create and configure Chrome WebDriver"""
     chrome_options = Options()
     if headless:
+        # Use headless mode when requested. Newer Chrome supports --headless=new but
+        # --headless is widely compatible.
         chrome_options.add_argument("--headless")
         chrome_options.add_argument("--window-size=1920,1080")
         chrome_options.add_argument("--start-maximized")
@@ -172,8 +174,6 @@ def manual_login(driver, main_url):
                         pass
             driver.switch_to.window(current_handle)
         
-            driver.switch_to.window(current_handle)
-        
         logger.info("\n" + "="*60)
         logger.info("MANUAL LOGIN REQUIRED")
         logger.info("="*60)
@@ -221,7 +221,8 @@ def login(driver, email, password, main_url):
         logger.info(f"Navigating to main website: {main_url}")
         driver.get(main_url)
         wait = WebDriverWait(driver, 20)
-        time.sleep(3)
+        # Avoid long fixed sleeps; rely on explicit waits below. If the page is slow,
+        # subsequent wait.until calls will wait up to the timeout specified above.
 
         # Step 1: Click "Student Dashboard" link
         logger.info("Step 1: Looking for 'Student Dashboard' link...")
@@ -243,7 +244,6 @@ def login(driver, email, password, main_url):
                     if len(driver.window_handles) > 1:
                         logger.info("New tab opened, switching to it...")
                         driver.switch_to.window(driver.window_handles[-1])
-                        time.sleep(2)
                     break
             except:
                 continue
@@ -251,7 +251,12 @@ def login(driver, email, password, main_url):
         if not dashboard_element:
             logger.warning("Warning: Could not find 'Student Dashboard' link. Trying to navigate directly...")
             driver.get("https://careertest.edumilestones.com/student-dashboard/")
-            time.sleep(3)
+            # Wait for either the iframe or page body to be present instead of sleeping
+            try:
+                WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, "iframe.loginIframe")))
+            except:
+                # fallback: wait for body so later waits can proceed
+                WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
 
         current_url = driver.current_url
         logger.info(f"Current URL: {current_url}")
@@ -295,7 +300,8 @@ def login(driver, email, password, main_url):
         email_field.send_keys(email)
         password_field.clear()
         password_field.send_keys(password)
-        time.sleep(1)
+        # No fixed sleep here; proceed to locate/click the button. If the page needs
+        # more time, the wait below will handle it.
 
         # Step 6: Click Login
         logger.info("\nStep 6: Clicking login button...")

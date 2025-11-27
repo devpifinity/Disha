@@ -128,7 +128,19 @@ python main.py Engineering null Bangalore null --engine playwright --format both
 python main.py null null null null --engine playwright --headless
 ```
 
-### 2. Batch Runner (Production)
+
+### 2. Saving to Supabase (Single Task)
+
+To save scraped data to the Supabase `search_criteria` table:
+1. Configure `SUPABASE_URL` and `SUPABASE_KEY` in `.env`.
+2. Add the `--manual-login` flag to your command.
+
+```bash
+# Scrape and save to Supabase
+python main.py Engineering null Dhanbad null --engine playwright --format json --headless --manual-login
+```
+
+### 3. Batch Runner (Production)
 
 Execute multiple tasks defined in `batch_config.py`.
 

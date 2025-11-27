@@ -2,11 +2,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { BookOpen, Compass, Target, Users } from "lucide-react";
-
-
-
-
+import { BookOpen, Compass, Target, Users, User } from "lucide-react";
 
 const Index = () => {
   return (
@@ -18,40 +14,50 @@ const Index = () => {
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-secondary/5 rounded-full blur-3xl"></div>
       </div>
       
-      <div className="container mx-auto px-4 py-8 relative z-10">
+      <div className="container mx-auto px-4 py-6 relative z-10 max-w-7xl">
+        {/* Profile Button */}
+        <div className="flex justify-end mb-6">
+          <Link to="/profile">
+            <Button variant="outline" className="gap-2 h-9">
+              <User className="w-4 h-4" />
+              My Profile
+            </Button>
+          </Link>
+        </div>
+
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-6xl font-bold bg-gradient-hero bg-clip-text text-transparent mb-4 drop-shadow-sm">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl md:text-5xl font-bold bg-gradient-hero bg-clip-text text-transparent mb-3">
             Welcome to Disha
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-            Your journey to discovering the perfect career starts here. Let's explore your future together!
+          <p className="text-base md:text-lg text-muted-foreground max-w-2xl mx-auto">
+            Your journey to discovering the perfect career starts here
           </p>
         </div>
 
         {/* Main Options */}
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-semibold text-center mb-8 text-foreground">
+        <div className="max-w-4xl mx-auto mb-12">
+          <h2 className="text-xl md:text-2xl font-semibold text-center mb-6 text-foreground">
             How would you like to get started?
           </h2>
           
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 gap-4">
             {/* Explore Option */}
-            <Card className="group hover:shadow-2xl transition-all duration-300 hover:scale-105 border-0 shadow-lg bg-card/80 backdrop-blur-sm">
-              <CardContent className="p-8 text-center">
-                <div className="mb-6">
-                  <div className="w-16 h-16 mx-auto bg-gradient-primary rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                    <Compass className="w-8 h-8 text-primary-foreground" />
+            <Card className="group hover:shadow-lg transition-all duration-200 border bg-card/90 backdrop-blur-sm">
+              <CardContent className="p-6 text-center">
+                <div className="mb-4">
+                  <div className="w-14 h-14 mx-auto bg-gradient-primary rounded-full flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-200">
+                    <Compass className="w-7 h-7 text-primary-foreground" />
                   </div>
-                  <h3 className="text-xl font-semibold text-card-foreground mb-3">
+                  <h3 className="text-lg font-semibold text-card-foreground mb-2">
                     I'm confused and need help!
                   </h3>
-                  <p className="text-muted-foreground mb-6">
-                    Take this quick quiz to find careers that could be a good match for you.
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Take a quick quiz to find careers that match your interests
                   </p>
                 </div>
                 <Link to="/quiz">
-                  <Button className="w-full font-medium py-3 rounded-lg bg-gradient-primary hover:shadow-lg transition-all duration-300">
+                  <Button className="w-full font-medium rounded-lg bg-gradient-primary hover:shadow-md transition-all duration-200">
                     Start Interest Quiz
                   </Button>
                 </Link>
@@ -59,23 +65,23 @@ const Index = () => {
             </Card>
 
             {/* Direct Search Option */}
-            <Card className="group hover:shadow-2xl transition-all duration-300 hover:scale-105 border-0 shadow-lg bg-card/80 backdrop-blur-sm">
-              <CardContent className="p-8 text-center">
-                <div className="mb-6">
-                  <div className="w-16 h-16 mx-auto bg-gradient-secondary rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                    <Target className="w-8 h-8 text-secondary-foreground" />
+            <Card className="group hover:shadow-lg transition-all duration-200 border bg-card/90 backdrop-blur-sm">
+              <CardContent className="p-6 text-center">
+                <div className="mb-4">
+                  <div className="w-14 h-14 mx-auto bg-gradient-secondary rounded-full flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-200">
+                    <Target className="w-7 h-7 text-secondary-foreground" />
                   </div>
-                  <h3 className="text-xl font-semibold text-card-foreground mb-3">
+                  <h3 className="text-lg font-semibold text-card-foreground mb-2">
                     I know what I'm looking for
                   </h3>
-                  <p className="text-muted-foreground mb-6">
-                    Search for specific careers, explore educational paths, or dive into detailed career information.
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Search for specific careers and explore educational paths
                   </p>
                 </div>
                 <Link to="/career-search">
                   <Button 
                     variant="outline" 
-                    className="w-full font-medium py-3 rounded-lg border-2 hover:shadow-lg transition-all duration-300"
+                    className="w-full font-medium rounded-lg border-2 hover:shadow-md transition-all duration-200"
                   >
                     Browse Careers
                   </Button>
@@ -86,31 +92,31 @@ const Index = () => {
         </div>
 
         {/* Features Section */}
-        <div className="mt-16 max-w-6xl mx-auto">
-          <h3 className="text-2xl font-semibold text-center mb-8 text-foreground">
+        <div className="max-w-6xl mx-auto">
+          <h3 className="text-xl md:text-2xl font-semibold text-center mb-6 text-foreground">
             What makes Disha special?
           </h3>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="text-center p-6 rounded-lg bg-card/50 backdrop-blur-sm hover:bg-card/70 transition-all duration-300">
-              <div className="w-12 h-12 mx-auto bg-gradient-primary rounded-full flex items-center justify-center mb-4 shadow-lg">
-                <BookOpen className="w-6 h-6 text-primary-foreground" />
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="text-center p-5 rounded-lg bg-card/50 backdrop-blur-sm hover:bg-card/70 transition-all duration-200">
+              <div className="w-11 h-11 mx-auto bg-gradient-primary rounded-full flex items-center justify-center mb-3">
+                <BookOpen className="w-5 h-5 text-primary-foreground" />
               </div>
-              <h4 className="font-semibold text-foreground mb-2">Comprehensive Guidance</h4>
-              <p className="text-muted-foreground text-sm">Get detailed information about career paths, education requirements, and growth opportunities.</p>
+              <h4 className="font-semibold text-foreground mb-2 text-sm">Comprehensive Guidance</h4>
+              <p className="text-muted-foreground text-xs leading-relaxed">Detailed information about career paths, education requirements, and growth opportunities</p>
             </div>
-            <div className="text-center p-6 rounded-lg bg-card/50 backdrop-blur-sm hover:bg-card/70 transition-all duration-300">
-              <div className="w-12 h-12 mx-auto bg-gradient-primary rounded-full flex items-center justify-center mb-4 shadow-lg">
-                <Compass className="w-6 h-6 text-primary-foreground" />
+            <div className="text-center p-5 rounded-lg bg-card/50 backdrop-blur-sm hover:bg-card/70 transition-all duration-200">
+              <div className="w-11 h-11 mx-auto bg-gradient-primary rounded-full flex items-center justify-center mb-3">
+                <Compass className="w-5 h-5 text-primary-foreground" />
               </div>
-              <h4 className="font-semibold text-foreground mb-2">Personalized Recommendations</h4>
-              <p className="text-muted-foreground text-sm">Our smart quiz analyzes your interests to suggest careers that truly fit your personality.</p>
+              <h4 className="font-semibold text-foreground mb-2 text-sm">Personalized Recommendations</h4>
+              <p className="text-muted-foreground text-xs leading-relaxed">Smart quiz that analyzes your interests and suggests careers that fit your personality</p>
             </div>
-            <div className="text-center p-6 rounded-lg bg-card/50 backdrop-blur-sm hover:bg-card/70 transition-all duration-300">
-              <div className="w-12 h-12 mx-auto bg-gradient-primary rounded-full flex items-center justify-center mb-4 shadow-lg">
-                <Users className="w-6 h-6 text-primary-foreground" />
+            <div className="text-center p-5 rounded-lg bg-card/50 backdrop-blur-sm hover:bg-card/70 transition-all duration-200">
+              <div className="w-11 h-11 mx-auto bg-gradient-primary rounded-full flex items-center justify-center mb-3">
+                <Users className="w-5 h-5 text-primary-foreground" />
               </div>
-              <h4 className="font-semibold text-foreground mb-2">Expert Insights</h4>
-              <p className="text-muted-foreground text-sm">Learn from industry professionals and get real-world perspectives on different career paths.</p>
+              <h4 className="font-semibold text-foreground mb-2 text-sm">Expert Insights</h4>
+              <p className="text-muted-foreground text-xs leading-relaxed">Real-world perspectives from industry professionals on different career paths</p>
             </div>
           </div>
         </div>
