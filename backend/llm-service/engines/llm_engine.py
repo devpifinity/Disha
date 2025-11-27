@@ -6,6 +6,9 @@ from datetime import datetime
 from models.college import College, Course, VerificationStatus, EvidenceStatus
 import google.generativeai as genai
 from json_repair import repair_json
+from utils.logger import setup_logger
+
+logger = setup_logger()
 
 class CollegeDiscoveryEngine:
     def __init__(self, api_key: str, model: str = None):
@@ -184,8 +187,8 @@ class CollegeDiscoveryEngine:
             try:
                 data = json.loads(raw_json)
             except json.JSONDecodeError as e:
-                print("Invalid JSON detected. Attempting repair")
-                print(f"JSON error: {e}")
+                logger.warning("Invalid JSON detected. Attempting repair")
+                logger.error(f"JSON error: {e}")
 
                 repaired = repair_json(raw_json)
                 data = json.loads(repaired)
@@ -193,7 +196,7 @@ class CollegeDiscoveryEngine:
             return self._parse_colleges_basic(data, location)
         
         except Exception as e:
-            print(f"Error in college list discovery {e}")
+            logger.error(f"Error in college list discovery {e}")
             return []
         
     async def _discover_batch_courses(self, colleges: List[College],
@@ -206,22 +209,22 @@ class CollegeDiscoveryEngine:
             json_match = re.search(r'\{.*\}', content, re.DOTALL)
 
             if not json_match:
-                print(f"No valid JSON found for batch")
+                logger.warning(f"No valid JSON found for batch")
                 return colleges
             
             raw_json = json_match.group()
             try:
                 data = json.loads(raw_json)
             except json.JSONDecodeError as e:
-                print("Invalid JSON detected in batch. Attempting repair")
-                print(f"JSON error: {e}")
+                logger.warning("Invalid JSON detected in batch. Attempting repair")
+                logger.error(f"JSON error: {e}")
                 repaired = repair_json(raw_json)
                 data = json.loads(repaired)
 
             return self._merge_batch_results(colleges, data)
         
         except Exception as e:
-            print(f"Error discovering batch courses: {e}")
+            logger.error(f"Error discovering batch courses: {e}")
             return colleges
         
     async def _call_gemini(self, prompt: str, max_tokens: int = 4000, use_search: bool = False) -> str:
@@ -279,7 +282,7 @@ class CollegeDiscoveryEngine:
                 )
                 colleges.append(college)
             except Exception as e:
-                print(f"Error parsing college data: {e}")
+                logger.error(f"Error parsing college data: {e}")
                 continue
 
         return colleges
@@ -322,7 +325,7 @@ class CollegeDiscoveryEngine:
                 )
                 courses.append(course)
             except Exception as e:
-                print(f"Error parsing course data: {e}")
+                logger.error(f"Error parsing course data: {e}")
                 continue
         return courses
 

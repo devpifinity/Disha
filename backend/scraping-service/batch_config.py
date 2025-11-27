@@ -22,38 +22,38 @@ BATCH_TASKS = [
     {
         "course_category": "Engineering",
         "specialization": None,
-        "city": "Chandigarh",
+        "city": "Dhanbad",
         "university": None,
-        "format": "json"
+        "format": "both"
     },
-    {
-        "course_category": "Engineering",
-        "specialization": None,
-        "city": "Bangalore",
-        "university": None,
-        "format": "json"
-    },
-    {
-        "course_category": "Engineering",
-        "specialization": None,
-        "city": "Hubli",
-        "university": None,
-        "format": "json"
-    },
-    {
-        "course_category": "Engineering",
-        "specialization": None,
-        "city": "Tumkur",
-        "university": None,
-        "format": "json"
-    },
-    {
-        "course_category": "Engineering",
-        "specialization": None,
-        "city": "Davangere",
-        "university": None,
-        "format": "json"
-    },
+    # {
+    #     "course_category": "Engineering",
+    #     "specialization": None,
+    #     "city": "Bangalore",
+    #     "university": None,
+    #     "format": "json"
+    # },
+    # {
+    #     "course_category": "Engineering",
+    #     "specialization": None,
+    #     "city": "Hubli",
+    #     "university": None,
+    #     "format": "json"
+    # },
+    # {
+    #     "course_category": "Engineering",
+    #     "specialization": None,
+    #     "city": "Tumkur",
+    #     "university": None,
+    #     "format": "json"
+    # },
+    # {
+    #     "course_category": "Engineering",
+    #     "specialization": None,
+    #     "city": "Davangere",
+    #     "university": None,
+    #     "format": "json"
+    # },
     # Add more tasks as needed
     # Example with different parameters:
     # {

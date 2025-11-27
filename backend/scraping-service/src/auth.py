@@ -13,6 +13,9 @@ import time
 import os
 import platform
 import stat
+from src.logger import setup_logger
+
+logger = setup_logger()
 
 
 def find_chromedriver_path(driver_path):
@@ -78,6 +81,8 @@ def create_driver(headless=False):
     chrome_options = Options()
     if headless:
         chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--window-size=1920,1080")
+        chrome_options.add_argument("--start-maximized")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
@@ -91,13 +96,13 @@ def create_driver(headless=False):
         # Fix the path if needed (webdriver-manager sometimes returns wrong path on macOS)
         driver_path = find_chromedriver_path(driver_path)
         
-        print(f"Using ChromeDriver at: {driver_path}")
+        logger.info(f"Using ChromeDriver at: {driver_path}")
         service = Service(driver_path)
         driver = webdriver.Chrome(service=service, options=chrome_options)
         return driver
     except Exception as e:
-        print(f"Error setting up ChromeDriver: {e}")
-        print("Attempting to use system ChromeDriver...")
+        logger.error(f"Error setting up ChromeDriver: {e}")
+        logger.info("Attempting to use system ChromeDriver...")
         # Fallback to system chromedriver if available
         try:
             service = Service()  # Will use system PATH
@@ -110,7 +115,7 @@ def create_driver(headless=False):
 def manual_login(driver, main_url):
     """Opens the login page and waits for user to manually log in"""
     try:
-        print(f"Navigating to main website: {main_url}")
+        logger.info(f"Navigating to main website: {main_url}")
         driver.get(main_url)
         
         # Wait for page to load
@@ -118,7 +123,7 @@ def manual_login(driver, main_url):
         time.sleep(3)
         
         # Step 1: Click "Student Dashboard" link/button
-        print("\nStep 1: Looking for 'Student Dashboard' link...")
+        logger.info("\nStep 1: Looking for 'Student Dashboard' link...")
         dashboard_selectors = [
             "//a[contains(text(), 'Student Dashboard')]",
             "//a[contains(text(), 'Student Dashboard') and contains(@href, 'dashboard')]",
@@ -131,13 +136,13 @@ def manual_login(driver, main_url):
             try:
                 dashboard_element = wait.until(EC.element_to_be_clickable((By.XPATH, selector)))
                 if dashboard_element and dashboard_element.is_displayed():
-                    print("Found 'Student Dashboard' link, clicking...")
+                    logger.info("Found 'Student Dashboard' link, clicking...")
                     dashboard_element.click()
                     time.sleep(5)
                     
                     # Handle tabs - switch to the latest tab if a new one opened
                     if len(driver.window_handles) > 1:
-                        print("New tab opened, switching to it...")
+                        logger.info("New tab opened, switching to it...")
                         driver.switch_to.window(driver.window_handles[-1])
                         time.sleep(2)
                     
@@ -146,17 +151,17 @@ def manual_login(driver, main_url):
                 continue
         
         if not dashboard_element:
-            print("Warning: Could not find 'Student Dashboard' link. Navigating directly...")
+            logger.warning("Warning: Could not find 'Student Dashboard' link. Navigating directly...")
             driver.get("https://careertest.edumilestones.com/student-dashboard/")
             time.sleep(3)
         
         # Ensure we're on the dashboard/login page
         current_url = driver.current_url
-        print(f"\nCurrent URL: {current_url}")
+        logger.info(f"\nCurrent URL: {current_url}")
         
         # Close extra tabs if any, keep the login tab
         if len(driver.window_handles) > 1:
-            print(f"Found {len(driver.window_handles)} tabs, keeping the login tab open...")
+            logger.info(f"Found {len(driver.window_handles)} tabs, keeping the login tab open...")
             current_handle = driver.current_window_handle
             for handle in driver.window_handles:
                 if handle != current_handle:
@@ -167,17 +172,19 @@ def manual_login(driver, main_url):
                         pass
             driver.switch_to.window(current_handle)
         
-        print("\n" + "="*60)
-        print("MANUAL LOGIN REQUIRED")
-        print("="*60)
-        print("\nPlease complete the login process in the browser:")
-        print("  1. Click on 'Student Log In' tab")
-        print("  2. Enter your email: kundu.ansh@yahoo.com")
-        print("  3. Enter your password")
-        print("  4. Click the 'LOG IN' button")
-        print("  5. Wait until you're logged in and see the dashboard")
-        print("\nThe browser window will remain open for you to log in.")
-        print("="*60)
+            driver.switch_to.window(current_handle)
+        
+        logger.info("\n" + "="*60)
+        logger.info("MANUAL LOGIN REQUIRED")
+        logger.info("="*60)
+        logger.info("\nPlease complete the login process in the browser:")
+        logger.info("  1. Click on 'Student Log In' tab")
+        logger.info("  2. Enter your email: kundu.ansh@yahoo.com")
+        logger.info("  3. Enter your password")
+        logger.info("  4. Click the 'LOG IN' button")
+        logger.info("  5. Wait until you're logged in and see the dashboard")
+        logger.info("\nThe browser window will remain open for you to log in.")
+        logger.info("="*60)
         
         # Wait for user to manually log in
         input("\nPress Enter AFTER you have successfully logged in and the dashboard is visible...")
@@ -187,19 +194,19 @@ def manual_login(driver, main_url):
         
         # Check if login was successful by looking at URL or page content
         final_url = driver.current_url
-        print(f"\nFinal URL after login: {final_url}")
+        logger.info(f"\nFinal URL after login: {final_url}")
         
         if 'dashboard' in final_url.lower() or 'login' not in final_url.lower():
-            print("✅ Login appears successful!")
+            logger.info("✅ Login appears successful!")
             return True
         else:
-            print("⚠️  Warning: Still appears to be on login page.")
-            print("Continuing anyway - please make sure you're logged in...")
+            logger.warning("⚠️  Warning: Still appears to be on login page.")
+            logger.info("Continuing anyway - please make sure you're logged in...")
             return True
             
     except Exception as e:
-        print(f"Error during manual login setup: {e}")
-        print("Continuing anyway...")
+        logger.error(f"Error during manual login setup: {e}")
+        logger.info("Continuing anyway...")
         return True
 
 
@@ -211,13 +218,13 @@ def login(driver, email, password, main_url):
     import time
 
     try:
-        print(f"Navigating to main website: {main_url}")
+        logger.info(f"Navigating to main website: {main_url}")
         driver.get(main_url)
         wait = WebDriverWait(driver, 20)
         time.sleep(3)
 
         # Step 1: Click "Student Dashboard" link
-        print("Step 1: Looking for 'Student Dashboard' link...")
+        logger.info("Step 1: Looking for 'Student Dashboard' link...")
         dashboard_selectors = [
             "//a[contains(text(), 'Student Dashboard')]",
             "//a[contains(text(), 'Student Dashboard') and contains(@href, 'dashboard')]",
@@ -230,11 +237,11 @@ def login(driver, email, password, main_url):
             try:
                 dashboard_element = wait.until(EC.element_to_be_clickable((By.XPATH, selector)))
                 if dashboard_element.is_displayed():
-                    print("Found 'Student Dashboard' link, clicking...")
+                    logger.info("Found 'Student Dashboard' link, clicking...")
                     dashboard_element.click()
                     time.sleep(5)
                     if len(driver.window_handles) > 1:
-                        print("New tab opened, switching to it...")
+                        logger.info("New tab opened, switching to it...")
                         driver.switch_to.window(driver.window_handles[-1])
                         time.sleep(2)
                     break
@@ -242,48 +249,48 @@ def login(driver, email, password, main_url):
                 continue
 
         if not dashboard_element:
-            print("Warning: Could not find 'Student Dashboard' link. Trying to navigate directly...")
+            logger.warning("Warning: Could not find 'Student Dashboard' link. Trying to navigate directly...")
             driver.get("https://careertest.edumilestones.com/student-dashboard/")
             time.sleep(3)
 
         current_url = driver.current_url
-        print(f"Current URL: {current_url}")
+        logger.info(f"Current URL: {current_url}")
 
         # Step 2: Wait for iframe to appear and switch into it
-        print("\nStep 2: Locating and switching to login iframe...")
+        logger.info("\nStep 2: Locating and switching to login iframe...")
         iframe = wait.until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "iframe.loginIframe"))
         )
         driver.switch_to.frame(iframe)
-        print("✅ Switched to iframe context")
+        logger.info("✅ Switched to iframe context")
 
         # Step 3: Activate "Student Log In" tab
-        print("\nStep 3: Activating 'Student Log In' tab inside iframe...")
+        logger.info("\nStep 3: Activating 'Student Log In' tab inside iframe...")
         try:
             login_tab = wait.until(
                 EC.element_to_be_clickable((By.XPATH, "//a[@data-toggle='tab' and @href='#login']"))
             )
             driver.execute_script("arguments[0].click();", login_tab)
             wait.until(lambda d: "in active" in d.find_element(By.ID, "login").get_attribute("class"))
-            print("✅ 'Student Log In' tab activated")
+            logger.info("✅ 'Student Log In' tab activated")
         except Exception as e:
-            print(f"⚠️ Could not click tab normally ({e}), forcing it active via JS...")
+            logger.warning(f"⚠️ Could not click tab normally ({e}), forcing it active via JS...")
             driver.execute_script("""
                 document.querySelector('#signup')?.classList.remove('in', 'active');
                 document.querySelector('#login')?.classList.add('in', 'active');
                 document.querySelector('#login')?.style.removeProperty('display');
             """)
             time.sleep(1)
-            print("✅ 'Student Log In' tab forced active via JS.")
+            logger.info("✅ 'Student Log In' tab forced active via JS.")
 
         # Step 4: Wait for login form fields
-        print("\nStep 4: Waiting for login form fields...")
+        logger.info("\nStep 4: Waiting for login form fields...")
         email_field = wait.until(EC.visibility_of_element_located((By.ID, "email")))
         password_field = wait.until(EC.visibility_of_element_located((By.ID, "password")))
-        print("✅ Email and password fields are visible")
+        logger.info("✅ Email and password fields are visible")
 
         # Step 5: Fill credentials
-        print("Entering credentials...")
+        logger.info("Entering credentials...")
         email_field.clear()
         email_field.send_keys(email)
         password_field.clear()
@@ -291,37 +298,37 @@ def login(driver, email, password, main_url):
         time.sleep(1)
 
         # Step 6: Click Login
-        print("\nStep 6: Clicking login button...")
+        logger.info("\nStep 6: Clicking login button...")
         login_button = wait.until(
             EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'LOG IN')]"))
         )
         driver.execute_script("arguments[0].click();", login_button)
-        print("✅ Login button clicked")
+        logger.info("✅ Login button clicked")
 
         # Step 7: Wait for login completion
-        print("\nStep 7: Waiting for login to complete...")
+        logger.info("\nStep 7: Waiting for login to complete...")
         time.sleep(5)
 
         # Switch back to main document
         driver.switch_to.default_content()
-        print("✅ Switched back to main document")
+        logger.info("✅ Switched back to main document")
 
         # Step 8: Verify login success
         final_url = driver.current_url
-        print(f"Final URL after login: {final_url}")
+        logger.info(f"Final URL after login: {final_url}")
 
         if "student-dashboard" in final_url.lower() or "login" not in final_url.lower():
-            print("\n✅ Login appears successful!")
+            logger.info("\n✅ Login appears successful!")
             return True
         else:
-            print("\n⚠️ Could not verify login success, continuing anyway...")
+            logger.warning("\n⚠️ Could not verify login success, continuing anyway...")
             return True
 
     except Exception as e:
-        print(f"\n❌ Error during login: {e}")
+        logger.error(f"\n❌ Error during login: {e}")
         import traceback
         traceback.print_exc()
-        print("\nAttempting to continue anyway...")
+        logger.info("\nAttempting to continue anyway...")
         try:
             driver.switch_to.default_content()
         except:
