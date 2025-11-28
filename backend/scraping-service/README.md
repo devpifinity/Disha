@@ -122,9 +122,9 @@ python main.py <Category> <Specialization> <City> <University> --engine playwrig
 
 # Examples
 # Scrape Engineering colleges in Bangalore using Playwright (Recommended)
-python main.py Engineering null Bangalore null --engine playwright --format both
+python main.py Engineering null Bangalore null --engine playwright --format both --save
 
-# Scrape everything in Headless mode
+# Scrape everything in Headless mode (no Supabase write)
 python main.py null null null null --engine playwright --headless
 ```
 
@@ -133,11 +133,14 @@ python main.py null null null null --engine playwright --headless
 
 To save scraped data to the Supabase `search_criteria` table:
 1. Configure `SUPABASE_URL` and `SUPABASE_KEY` in `.env`.
-2. Add the `--manual-login` flag to your command.
+2. Append the `--save` flag to your command. Works with both engines; only the JSON output is pushed.
+3. Ensure the City filter resolves to a single location (either explicitly via CLI or implicitly via the scraped JSON); the Supabase table requires a non-null city.
+
+If you omit a filter value, the CLI/UI will try to infer it from the scrape results and will surface Supabase's response message (e.g., `Inserted new record...`) back to you. When inference fails (multiple cities detected), the push is blocked so you can rerun with precise filters.
 
 ```bash
 # Scrape and save to Supabase
-python main.py Engineering null Dhanbad null --engine playwright --format json --headless --manual-login
+python main.py Engineering null Dhanbad null --engine playwright --format json --headless --save
 ```
 
 ### 3. Batch Runner (Production)
@@ -160,6 +163,12 @@ python batch_runner.py --engine playwright --headless
 | `--format` | Output format: `csv`, `json`, `both` | `csv` |
 | `--headless` | Run without browser UI | `False` |
 | `--manual-login` | Pause for manual login (Selenium only) | `False` |
+| `--save` | Push the generated JSON to Supabase (requires resolvable city) | `False` |
+
+**Manual login vs. save**
+- `--manual-login` keeps the Selenium browser open so you can complete CAPTCHAs/MFA when automatic login fails. Playwright ignores it.
+- `--save` writes the transformed JSON output to Supabase after files are written. Use it whenever you want your run persisted.
+- Supabase pushes (via CLI `--save` or the Streamlit UI) now infer the metadata from the JSON payload and display the exact Supabase result message. If no unique city can be determined, the push is prevented to avoid violating the database schema.
 
 ---
 

@@ -62,7 +62,10 @@ Note: Use 'null' for filters you want to skip
                         help='Run browser in headless mode')
     parser.add_argument('--manual-login',
                         action='store_true',
-                        help='Use manual login instead of automatic')
+                        help='Use manual login instead of automatic (Selenium only)')
+    parser.add_argument('--save',
+                        action='store_true',
+                        help='Save scraped data to Supabase')
     parser.add_argument('--engine',
                         choices=['selenium', 'playwright'],
                         default='selenium',
@@ -70,7 +73,7 @@ Note: Use 'null' for filters you want to skip
     parser.add_argument('--output', '-o',
                         help='Override base filename (without extension). Defaults to filters combination.')
     
-    return parser.parse_args()
+    return parser.parse_args() 
 
 def build_base_filename(course_category, specialization, city, university, override: str = None) -> str:
     """Determine a safe base filename for exports"""
@@ -149,7 +152,7 @@ def main():
                     OUTPUT_DIR, 
                     base_filename, 
                     output_formats,
-                    manual_login=args.manual_login,
+                    push_to_supabase=args.save,
                     career_path=course_category,
                     specialization=specialization,
                     location=city,
@@ -250,7 +253,7 @@ def main():
                     OUTPUT_DIR, 
                     base_filename, 
                     output_formats,
-                    manual_login=args.manual_login,
+                    push_to_supabase=args.save,
                     career_path=course_category,
                     specialization=specialization,
                     location=city,

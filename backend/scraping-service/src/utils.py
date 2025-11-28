@@ -5,7 +5,7 @@ import csv
 import pandas as pd
 import json
 import os
-from typing import List, Dict, Set, Optional, Any
+from typing import List, Dict, Set, Optional, Any, Tuple
 from supabase import create_client, Client
 from src.config import SUPABASE_URL, SUPABASE_KEY
 from src.logger import setup_logger
@@ -161,7 +161,7 @@ def save_to_supabase(
     specialization: Optional[str],
     location: Optional[str],
     university: Optional[str]
-) -> bool:
+) -> Tuple[bool, str]:
     """
     Save or update data in Supabase search_criteria table
     
@@ -173,19 +173,26 @@ def save_to_supabase(
         university: University filter or None
     
     Returns:
-        bool: True if successful, False otherwise
+        Tuple[bool, str]: Success flag and status message
     """
     try:
         if not SUPABASE_URL or not SUPABASE_KEY:
-            logger.warning("Supabase credentials not found. Skipping Supabase save.")
-            return False
+            msg = "Supabase credentials not found. Skipping Supabase save."
+            logger.warning(msg)
+            return False, msg
+
+        location_value = (location or "").strip()
+        if not location_value:
+            msg = "Location is required to save data to Supabase."
+            logger.error(msg)
+            return False, msg
 
         # Initialize Supabase client
         supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
         
         # Prepare the data for search_criteria table
         # Format location as "city, state" if available, or just city
-        location_str = location or ""
+        location_str = location_value
         
         # Ensure we pass a dict for the jsonb column. Use the provided `json_data`.
         if isinstance(json_data, dict):
@@ -197,39 +204,45 @@ def save_to_supabase(
                 llm_json = {"colleges": json_data}
 
         # Prepare the record data (include location so upsert conflict keys match)
+        normalized_career_path = career_path.strip() if career_path else None
+        normalized_specialization = specialization.strip() if specialization else None
+        normalized_university = university.strip() if university else None
+
+        def _normalize_case(value: Optional[str]) -> Optional[str]:
+            if not value:
+                return None
+            cleaned = value.strip()
+            if not cleaned:
+                return None
+            return cleaned[:1].upper() + cleaned[1:]
+
+        normalized_career_path = _normalize_case(normalized_career_path)
+        normalized_specialization = _normalize_case(normalized_specialization)
+        normalized_university = _normalize_case(normalized_university)
+        normalized_location = _normalize_case(location_str)
+
         record_data = {
-            "career_path": career_path or None,
-            "specialization": specialization or None,
-            "university": university or None,
-            "location": location_str or None,
+            "career_path": normalized_career_path,
+            "specialization": normalized_specialization,
+            "university": normalized_university,
+            "location": normalized_location,
             "llm_json": llm_json
         }
         
+        def _apply_filter(query_obj, column: str, value: Optional[str]):
+            if value is None:
+                return query_obj.filter(column, "is", "null")
+            return query_obj.eq(column, value)
+
         # First try to find an existing record that matches the four key columns
         # If found -> update the existing record. Otherwise -> insert a new record.
         try:
             query = supabase.table("search_criteria").select("*")
 
-            # Match or is NULL depending on whether value was provided
-            if career_path:
-                query = query.eq("career_path", career_path)
-            else:
-                query = query.is_("career_path", None)
-
-            if specialization:
-                query = query.eq("specialization", specialization)
-            else:
-                query = query.is_("specialization", None)
-
-            if university:
-                query = query.eq("university", university)
-            else:
-                query = query.is_("university", None)
-
-            if location_str:
-                query = query.eq("location", location_str)
-            else:
-                query = query.is_("location", None)
+            query = _apply_filter(query, "career_path", normalized_career_path)
+            query = _apply_filter(query, "specialization", normalized_specialization)
+            query = _apply_filter(query, "university", normalized_university)
+            query = _apply_filter(query, "location", normalized_location)
 
             existing = query.limit(1).execute()
 
@@ -238,24 +251,28 @@ def save_to_supabase(
                 record_id = existing.data[0].get("id")
                 if record_id:
                     supabase.table("search_criteria").update(record_data).eq("id", record_id).execute()
-                    logger.info(f"Updated existing record in Supabase (ID: {record_id})")
-                    return True
+                    msg = f"Updated existing record in Supabase (ID: {record_id})"
+                    logger.info(msg)
+                    return True, msg
 
             # No matching record found -> insert a new one
             response = supabase.table("search_criteria").insert(record_data).execute()
             if getattr(response, "data", None) and len(response.data) > 0:
-                logger.info(f"Inserted new record in Supabase (ID: {response.data[0].get('id', 'N/A')})")
-                return True
+                msg = f"Inserted new record in Supabase (ID: {response.data[0].get('id', 'N/A')})"
+                logger.info(msg)
+                return True, msg
             else:
-                logger.warning("Supabase insert returned no data")
-                return False
+                msg = "Supabase insert returned no data"
+                logger.warning(msg)
+                return False, msg
         except Exception as e:
             logger.error(f"Supabase operation failed: {e}")
             raise
             
     except Exception as e:
-        logger.error(f"Error saving to Supabase: {e}")
-        return False
+        msg = f"Error saving to Supabase: {e}"
+        logger.error(msg)
+        return False, msg
 
 
 def save_to_csv(data: List[Dict], output_dir: str, filename: str):
@@ -282,7 +299,7 @@ def save_to_json(
     data: List[Dict], 
     output_dir: str, 
     filename: str,
-    manual_login: bool = False,
+    push_to_supabase: bool = False,
     career_path: Optional[str] = None,
     specialization: Optional[str] = None,
     location: Optional[str] = None,
@@ -295,7 +312,7 @@ def save_to_json(
         data: List of college dictionaries
         output_dir: Directory to save the file
         filename: Name of the file
-        manual_login: If True, also save to Supabase
+        push_to_supabase: If True, also save to Supabase
         career_path: Career path filter for Supabase
         specialization: Specialization filter for Supabase
         location: Location filter for Supabase
@@ -322,16 +339,20 @@ def save_to_json(
         logger.info(f"JSON saved to {filepath}")
         logger.info(f"Total unique records: {len(transformed_data)}")
         
-        # Save to Supabase if manual_login is True
-        if manual_login:
-            logger.info(f"Saving to Supabase...")
-            save_to_supabase(
+        # Save to Supabase when explicitly requested
+        if push_to_supabase:
+            logger.info("Saving to Supabase...")
+            success, supabase_msg = save_to_supabase(
                 json_data=json_data,
                 career_path=career_path,
                 specialization=specialization,
                 location=location,
                 university=university
             )
+            if success:
+                logger.info(supabase_msg)
+            else:
+                logger.error(supabase_msg)
         
         return filepath
     else:
@@ -344,7 +365,7 @@ def save_data(
     output_dir: str, 
     base_filename: str, 
     formats: List[str] = ['csv'],
-    manual_login: bool = False,
+    push_to_supabase: bool = False,
     career_path: Optional[str] = None,
     specialization: Optional[str] = None,
     location: Optional[str] = None,
@@ -358,7 +379,7 @@ def save_data(
         output_dir: Directory to save files
         base_filename: Base filename without extension
         formats: List of formats to save ('csv', 'json', or both)
-        manual_login: If True, also save to Supabase when saving JSON
+        push_to_supabase: If True, also save to Supabase when saving JSON
         career_path: Career path filter for Supabase
         specialization: Specialization filter for Supabase
         location: Location filter for Supabase
@@ -384,7 +405,7 @@ def save_data(
                 data, 
                 output_dir, 
                 filename,
-                manual_login=manual_login,
+                push_to_supabase=push_to_supabase,
                 career_path=career_path,
                 specialization=specialization,
                 location=location,
