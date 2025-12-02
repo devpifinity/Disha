@@ -21,71 +21,36 @@ BATCH_DELAY = 5
 BATCH_TASKS = [
     {
         "course_category": "Engineering",
-        "specialization": "Food",
-        "city": "Bangalore",
+        "specialization": None,
+        "city": "Dhanbad",
         "university": None,
-        "format": "json"
-    },
-    {
-        "course_category": "Engineering",
-        "specialization": "Mechatronics",
-        "city": "Bangalore",
-        "university": None,
-        "format": "json"
-    },
-    {
-        "course_category": "Engineering",
-        "specialization": "Metallurgical",
-        "city": "Bangalore",
-        "university": None,
-        "format": "json"
-    },
-    {
-        "course_category": "Engineering",
-        "specialization": "Mining",
-        "city": "Bangalore",
-        "university": None,
-        "format": "json"
-    },
-    {
-        "course_category": "Engineering",
-        "specialization": "Petroleum",
-        "city": "Bangalore",
-        "university": None,
-        "format": "json"
-    },
-    {
-        "course_category": "Engineering",
-        "specialization": "Robotics",
-        "city": "Bangalore",
-        "university": None,
-        "format": "json"
+        "format": "both"
     },
     # {
     #     "course_category": "Engineering",
     #     "specialization": None,
-    #     "city": "Hosur",
+    #     "city": "Bangalore",
     #     "university": None,
     #     "format": "json"
     # },
     # {
     #     "course_category": "Engineering",
     #     "specialization": None,
-    #     "city": "Krishnagiri",
+    #     "city": "Hubli",
     #     "university": None,
     #     "format": "json"
     # },
     # {
     #     "course_category": "Engineering",
     #     "specialization": None,
-    #     "city": "Hassan",
+    #     "city": "Tumkur",
     #     "university": None,
     #     "format": "json"
     # },
     # {
     #     "course_category": "Engineering",
     #     "specialization": None,
-    #     "city": "Chitradurga",
+    #     "city": "Davangere",
     #     "university": None,
     #     "format": "json"
     # },

@@ -5,6 +5,9 @@ from urllib.parse import urlparse, urljoin
 import time
 from typing import Dict, List, Optional
 from models.college import College, EvidenceStatus
+from utils.logger import setup_logger
+
+logger = setup_logger()
 
 class EvidenceValidator:
     def __init__(self, delay: float = 2.0):
@@ -42,7 +45,7 @@ class EvidenceValidator:
                         course.evidence_urls = validation_result.get('course_evidence', [])
 
                 except Exception as e:
-                    print(f"Validation error for {college.name}: {e}")
+                    logger.error(f"Validation error for {college.name}: {e}")
                     college.evidence_status = EvidenceStatus.NO_EVIDENCE_FOUND
                     college.overall_confidence *= 0.6
                     college.validation_details = {
@@ -244,7 +247,7 @@ class EvidenceValidator:
                     }
                 
         except Exception as e:
-            print(f"Website validation error for {url}: {e}")
+            logger.warning(f"Website validation error for {url}: {e}")
 
         return {
             'accessible': False, 
@@ -287,7 +290,7 @@ class EvidenceValidator:
                     continue
 
         except Exception as e:
-            print(f"Course evidence search error: {e}")
+            logger.error(f"Course evidence search error: {e}")
 
         return list(set(evidence_urls))
     

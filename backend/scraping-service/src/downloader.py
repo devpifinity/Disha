@@ -14,6 +14,9 @@ import os
 import re
 from typing import List, Dict, Optional
 from src.utils import clean_text
+from src.logger import setup_logger
+
+logger = setup_logger()
 
 
 def build_search_url(base_url: str, course_category: str = None, specialization: str = None, 
@@ -33,7 +36,7 @@ def build_search_url(base_url: str, course_category: str = None, specialization:
 
 def scroll_to_load_all(driver, max_scrolls=50):
     """Scroll progressively to load all college entries"""
-    print("Scrolling to load all colleges...")
+    logger.info("Scrolling to load all colleges...")
     
     last_height = driver.execute_script("return document.body.scrollHeight")
     scroll_attempts = 0
@@ -50,11 +53,11 @@ def scroll_to_load_all(driver, max_scrolls=50):
         if new_height == last_height:
             no_change_count += 1
             if no_change_count >= 3:
-                print("Reached end of page")
+                logger.info("Reached end of page")
                 break
         else:
             no_change_count = 0
-            print(f"Loaded more content (scroll {scroll_attempts + 1})")
+            logger.info(f"Loaded more content (scroll {scroll_attempts + 1})")
         
         last_height = new_height
         scroll_attempts += 1
@@ -70,7 +73,7 @@ def scroll_to_load_all(driver, max_scrolls=50):
     driver.execute_script("window.scrollTo(0, 0);")
     time.sleep(2)
     
-    print(f"Scrolling complete: {scroll_attempts} scrolls")
+    logger.info(f"Scrolling complete: {scroll_attempts} scrolls")
 
 
 def wait_for_content_update(driver, old_course_name, timeout=5):
@@ -110,7 +113,7 @@ def get_course_options_from_dropdown(driver, card_index: int):
         # Get the dropdown button within this specific card
         dropdown_buttons = card.find_elements(By.CSS_SELECTOR, "button.dropdown-toggle")
         if not dropdown_buttons:
-            print("  No dropdown button found")
+            logger.warning("  No dropdown button found")
             return courses
         
         dropdown_button = dropdown_buttons[0]
@@ -130,7 +133,7 @@ def get_course_options_from_dropdown(driver, card_index: int):
                     break
             
             if not visible_menu:
-                print("  No visible dropdown menu found")
+                logger.warning("  No visible dropdown menu found")
                 # Try to close any open dropdowns
                 driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.ESCAPE)
                 return courses
@@ -153,10 +156,10 @@ def get_course_options_from_dropdown(driver, card_index: int):
                 except:
                     continue
             
-            print(f"  Found {len(courses)} courses in dropdown")
+            logger.info(f"  Found {len(courses)} courses in dropdown")
             
         except Exception as e:
-            print(f"  Error reading dropdown: {e}")
+            logger.error(f"  Error reading dropdown: {e}")
         
         # Close dropdown
         try:
@@ -166,7 +169,7 @@ def get_course_options_from_dropdown(driver, card_index: int):
             pass
         
     except Exception as e:
-        print(f"  Error opening dropdown: {e}")
+        logger.error(f"  Error opening dropdown: {e}")
     
     return courses
 
@@ -244,7 +247,7 @@ def extract_course_specific_data(driver, card_index: int) -> Optional[Dict]:
         return course_data
         
     except Exception as e:
-        print(f"  Error extracting course data: {e}")
+        logger.error(f"  Error extracting course data: {e}")
         return None
 
 
@@ -343,7 +346,7 @@ def extract_college_level_data(driver, card_index: int) -> Optional[Dict]:
         return college_data
         
     except Exception as e:
-        print(f"  Error extracting college data: {e}")
+        logger.error(f"  Error extracting college data: {e}")
         return None
 
 
@@ -415,7 +418,7 @@ def click_course_in_dropdown(driver, card_index: int, data_search: str, max_retr
             
         except Exception as e:
             if attempt < max_retries - 1:
-                print(f"    Retry {attempt + 1}/{max_retries}: {str(e)[:80]}")
+                logger.warning(f"    Retry {attempt + 1}/{max_retries}: {str(e)[:80]}")
                 time.sleep(1)
                 # Try to close any open dropdowns
                 try:
@@ -424,7 +427,7 @@ def click_course_in_dropdown(driver, card_index: int, data_search: str, max_retr
                 except:
                     pass
             else:
-                print(f"    Failed after {max_retries} attempts: {str(e)[:80]}")
+                logger.error(f"    Failed after {max_retries} attempts: {str(e)[:80]}")
                 return False
     
     return False
@@ -445,10 +448,10 @@ def extract_college_card_data_all_courses(driver, card_index: int) -> Optional[D
         college_data = extract_college_level_data(driver, card_index)
         
         if not college_data or not college_data.get('College Name'):
-            print(f"  Card {card_index}: Could not find college name, skipping")
+            logger.warning(f"  Card {card_index}: Could not find college name, skipping")
             return None
         
-        print(f"  Card {card_index}: Processing '{college_data['College Name']}'")
+        logger.info(f"  Card {card_index}: Processing '{college_data['College Name']}'")
         
         # Initialize courses array
         courses_array = []
@@ -457,47 +460,47 @@ def extract_college_card_data_all_courses(driver, card_index: int) -> Optional[D
         current_course_data = extract_course_specific_data(driver, card_index)
         if current_course_data and current_course_data.get('Course Name'):
             courses_array.append(current_course_data)
-            print(f"    ✓ Current course: {current_course_data['Course Name']}")
+            logger.info(f"    ✓ Current course: {current_course_data['Course Name']}")
         
         # Get all course options from dropdown
         course_options = get_course_options_from_dropdown(driver, card_index)
         
         if not course_options:
-            print(f"    No additional courses found in dropdown")
+            logger.info(f"    No additional courses found in dropdown")
         else:
             # Iterate through each course option
             for idx, course in enumerate(course_options):
                 try:
-                    print(f"    Processing course {idx + 1}/{len(course_options)}: {course['name'][:50]}...")
+                    logger.info(f"    Processing course {idx + 1}/{len(course_options)}: {course['name'][:50]}...")
                     
                     # Click the course in dropdown
                     success = click_course_in_dropdown(driver, card_index, course['data_search'])
                     
                     if not success:
-                        print(f"    ✗ Course {idx + 1}/{len(course_options)}: Failed to click")
+                        logger.warning(f"    ✗ Course {idx + 1}/{len(course_options)}: Failed to click")
                         continue
                     
                     # Extract data for this course
                     course_data = extract_course_specific_data(driver, card_index)
                     if course_data and course_data.get('Course Name'):
                         courses_array.append(course_data)
-                        print(f"    ✓ Course {idx + 1}/{len(course_options)}: {course_data['Course Name']}")
+                        logger.info(f"    ✓ Course {idx + 1}/{len(course_options)}: {course_data['Course Name']}")
                     else:
-                        print(f"    ✗ Course {idx + 1}/{len(course_options)}: Failed to extract data")
+                        logger.warning(f"    ✗ Course {idx + 1}/{len(course_options)}: Failed to extract data")
                     
                 except Exception as e:
-                    print(f"    ✗ Course {idx + 1}/{len(course_options)}: Error - {str(e)[:100]}")
+                    logger.error(f"    ✗ Course {idx + 1}/{len(course_options)}: Error - {str(e)[:100]}")
                     continue
         
         # Add courses array to college data
         college_data['Courses'] = courses_array
         
-        print(f"    Total courses extracted: {len(courses_array)}")
+        logger.info(f"    Total courses extracted: {len(courses_array)}")
         
         return college_data
         
     except Exception as e:
-        print(f"  Error extracting college card data: {e}")
+        logger.error(f"  Error extracting college card data: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -511,21 +514,21 @@ def extract_college_data(driver) -> List[Dict]:
         wait = WebDriverWait(driver, 10)
         time.sleep(3)
         
-        print("Extracting college data...")
+        logger.info("Extracting college data...")
         
         # Scroll to load all results
         scroll_to_load_all(driver)
         
         # Find all college cards
-        print("Looking for college cards...")
+        logger.info("Looking for college cards...")
         college_cards = driver.find_elements(By.CSS_SELECTOR, "div.college-box")
         
         if not college_cards:
-            print("No college cards found")
+            logger.warning("No college cards found")
             return []
         
-        print(f"Found {len(college_cards)} college cards")
-        print("Extracting data for all courses in each college...\n")
+        logger.info(f"Found {len(college_cards)} college cards")
+        logger.info("Extracting data for all courses in each college...\n")
         
         # Extract data from each card
         for idx in range(len(college_cards)):
@@ -535,20 +538,20 @@ def extract_college_data(driver) -> List[Dict]:
                 if college_data:
                     colleges.append(college_data)
                 
-                print()  # Blank line between colleges
+                logger.info("")  # Blank line between colleges
                 
             except Exception as e:
-                print(f"  Error processing card {idx}: {e}")
+                logger.error(f"  Error processing card {idx}: {e}")
                 continue
         
-        print(f"\nExtraction complete:")
-        print(f"  - Total college cards processed: {len(college_cards)}")
-        print(f"  - Total colleges extracted: {len(colleges)}")
+        logger.info(f"\nExtraction complete:")
+        logger.info(f"  - Total college cards processed: {len(college_cards)}")
+        logger.info(f"  - Total colleges extracted: {len(colleges)}")
         total_courses = sum(len(c.get('Courses', [])) for c in colleges)
-        print(f"  - Total course records extracted: {total_courses}")
+        logger.info(f"  - Total course records extracted: {total_courses}")
         
     except Exception as e:
-        print(f"Error extracting college data: {e}")
+        logger.error(f"Error extracting college data: {e}")
         import traceback
         traceback.print_exc()
     
@@ -559,7 +562,7 @@ def try_download_report(driver):
     """Try to download CSV report using the Report button"""
     try:
         wait = WebDriverWait(driver, 10)
-        print("Checking for 'Report' button to download CSV...")
+        logger.info("Checking for 'Report' button to download CSV...")
         
         report_selectors = [
             "//button[contains(text(), 'Report')]",
@@ -573,19 +576,19 @@ def try_download_report(driver):
             try:
                 report_btn = driver.find_element(By.XPATH, selector)
                 if report_btn.is_displayed() and report_btn.is_enabled():
-                    print("Found 'Report' button, clicking to download CSV...")
+                    logger.info("Found 'Report' button, clicking to download CSV...")
                     report_btn.click()
                     time.sleep(5)
-                    print("CSV download initiated via Report button")
+                    logger.info("CSV download initiated via Report button")
                     return True
             except:
                 continue
         
-        print("Report button not found or not clickable")
+        logger.warning("Report button not found or not clickable")
         return False
         
     except Exception as e:
-        print(f"Error trying to download report: {e}")
+        logger.error(f"Error trying to download report: {e}")
         return False
 
 
@@ -596,7 +599,7 @@ def get_all_results(driver, max_pages=10):
     try:
         page = 1
         while page <= max_pages:
-            print(f"\nExtracting page {page}...")
+            logger.info(f"\nExtracting page {page}...")
             colleges = extract_college_data(driver)
             all_colleges.extend(colleges)
             
@@ -615,6 +618,6 @@ def get_all_results(driver, max_pages=10):
                 break
                 
     except Exception as e:
-        print(f"Error getting all results: {e}")
+        logger.error(f"Error getting all results: {e}")
     
     return all_colleges

@@ -11,6 +11,9 @@ from engines.validation_engine import EvidenceValidator
 from engines.supabase_integration import SupabaseIntegration
 from models.college import EvidenceStatus
 from json_repair import repair_json
+from utils.logger import setup_logger
+
+logger = setup_logger()
 
 load_dotenv()
 
@@ -266,7 +269,7 @@ if st.button("Run Discovery", type="primary", use_container_width=True):
                     return engine._parse_colleges_basic(data, location)
 
                 except Exception as e:
-                    print(f"Error in college list discovery: {e}")
+                    logger.error(f"Error in college list discovery: {e}")
                     return []
             
             colleges = loop.run_until_complete(discover_colleges_with_custom_prompt())
@@ -324,7 +327,7 @@ if st.button("Run Discovery", type="primary", use_container_width=True):
             batch_calls = (len(colleges) + batch_size - 1) // batch_size
             savings = ((single_call_estimate - batch_calls) / single_call_estimate) * 100
             st.info(f"💡 **API Call Optimization:** Used {batch_calls} calls instead of {single_call_estimate} (saved {savings:.0f}%!)")
-            
+
             if career_path:
                 original_count = len(colleges)
                 colleges = [c for c in colleges if len(c.courses) > 0]

@@ -3,6 +3,9 @@ from typing import List, Dict, Optional
 from supabase import create_client, Client
 from datetime import datetime
 from models.college import College, Course
+from utils.logger import setup_logger
+
+logger = setup_logger()
 
 class SupabaseIntegration:
     def __init__(self, url: str = None, key: str = None):
@@ -51,23 +54,23 @@ class SupabaseIntegration:
                 
                 if college_id:
                     results['colleges_inserted'] += 1
-                    print(f"Inserted college: {college.name} (ID: {college_id})")
+                    logger.info(f"Inserted college: {college.name} (ID: {college_id})")
                     
                     for course in college.courses:
                         course_id = None
                         
                         if course.name in course_name_to_id:
                             course_id = course_name_to_id[course.name]
-                            print(f"Reusing existing course: {course.name} (ID: {course_id})")
+                            logger.info(f"Reusing existing course: {course.name} (ID: {course_id})")
                         else:
                             course_id = await self._insert_staging_course(course)
                             if course_id:
                                 results['courses_inserted'] += 1
                                 course_name_to_id[course.name] = course_id
-                                print(f"Inserted course: {course.name} (ID: {course_id})")
+                                logger.info(f"Inserted course: {course.name} (ID: {course_id})")
                             else:
                                 results['courses_failed'] += 1
-                                print(f"Failed to insert course: {course.name}")
+                                logger.error(f"Failed to insert course: {course.name}")
                         
                         if course_id:
                             link_success = await self._link_college_course_staging(
@@ -79,17 +82,17 @@ class SupabaseIntegration:
                                 results['relationships_failed'] += 1
                 else:
                     results['colleges_failed'] += 1
-                    print(f"Failed to insert college: {college.name}")
+                    logger.error(f"Failed to insert college: {college.name}")
                     
             except Exception as e:
                 results['colleges_failed'] += 1
                 results['errors'].append(f"{college.name}: {str(e)}")
-                print(f"Error processing {college.name}: {e}")
+                logger.error(f"Error processing {college.name}: {e}")
         
-        print(f"\nSUMMARY:")
-        print(f"   Colleges: {results['colleges_inserted']} inserted, {results['colleges_failed']} failed")
-        print(f"   Courses: {results['courses_inserted']} inserted, {results['courses_failed']} failed")
-        print(f"   Relationships: {results['relationships_created']} created, {results['relationships_failed']} failed")
+        logger.info(f"\nSUMMARY:\n")
+        logger.info(f" Colleges: {results['colleges_inserted']} inserted, {results['colleges_failed']} failed")
+        logger.info(f" Courses: {results['courses_inserted']} inserted, {results['courses_failed']} failed")
+        logger.info(f" Relationships: {results['relationships_created']} created, {results['relationships_failed']} failed")
         
         return results
     
@@ -129,7 +132,7 @@ class SupabaseIntegration:
             return None
             
         except Exception as e:
-            print(f"Error inserting college {college.name} to staging: {e}")
+            logger.error(f"Error inserting college {college.name} to staging: {e}")
             return None
     
     async def _insert_staging_course(self, course: Course) -> Optional[str]:
@@ -158,7 +161,7 @@ class SupabaseIntegration:
             return None
             
         except Exception as e:
-            print(f"Error inserting course {course.name} to staging: {e}")
+            logger.error(f"Error inserting course {course.name} to staging: {e}")
             return None
     
     async def _link_college_course_staging(self, college_id: str, course_id: str) -> bool:
@@ -180,7 +183,7 @@ class SupabaseIntegration:
                        .execute())
             
             if existing.data and len(existing.data) > 0:
-                print(f"Relationship already exists")
+                logger.debug(f"Relationship already exists")
                 return True
             
             link_data = {
@@ -192,12 +195,12 @@ class SupabaseIntegration:
             response = self.client.table('st_college_course_jobs').insert(link_data).execute()
             
             if response.data and len(response.data) > 0:
-                print(f"Created relationship")
+                logger.debug(f"Created relationship")
                 return True
             return False
             
         except Exception as e:
-            print(f"Error linking college-course: {e}")
+            logger.error(f"Error linking college-course: {e}")
             return False
     
     def _get_confidence_level(self, confidence: float) -> str:
@@ -257,7 +260,7 @@ class SupabaseIntegration:
             response = self.client.table('st_college').select('id').limit(1).execute()
             return True
         except Exception as e:
-            print(f"Connection test failed: {e}")
+            logger.error(f"Connection test failed: {e}")
             return False
     
     async def get_staging_stats(self) -> Dict:
@@ -280,7 +283,7 @@ class SupabaseIntegration:
                 'confidence_breakdown': confidence_breakdown
             }
         except Exception as e:
-            print(f"Error getting staging stats: {e}")
+            logger.error(f"Error getting staging stats: {e}")
             return {}
     
     async def clear_staging_tables(self) -> Dict:
@@ -299,5 +302,5 @@ class SupabaseIntegration:
                 'relationships_deleted': len(relationship_response.data) if relationship_response.data else 0
             }
         except Exception as e:
-            print(f"Error clearing staging tables: {e}")
+            logger.error(f"Error clearing staging tables: {e}")
             return {'success': False, 'error': str(e)}

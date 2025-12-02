@@ -12,8 +12,8 @@ project_root = Path(__file__).parent.parent
 load_dotenv(dotenv_path=project_root / '.env')
 
 # Login credentials
-LOGIN_EMAIL = "kundu.ansh@yahoo.com"
-LOGIN_PASSWORD = "anshk05"
+LOGIN_EMAIL = os.getenv("LOGIN_EMAIL", "kundu.ansh@yahoo.com")
+LOGIN_PASSWORD = os.getenv("LOGIN_PASSWORD", "anshk05")
 
 # URLs
 MAIN_URL = "https://careerzoom.edumilestones.com/"
@@ -32,6 +32,6 @@ MAX_SCROLLS = 50  # Maximum number of scrolls to load all colleges
 MAX_PAGES = 10    # Maximum number of pages to scrape (pagination)
 SCROLL_PAUSE_TIME = 2  # Seconds to wait between scrolls
 
-# Supabase settings - loaded from .env file
+# Supabase settings
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
