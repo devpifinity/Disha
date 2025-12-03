@@ -11,14 +11,23 @@ from engines.validation_engine import EvidenceValidator
 from engines.supabase_integration import SupabaseIntegration
 from models.college import EvidenceStatus
 from json_repair import repair_json
-from utils.logger import setup_logger
+from models.colleges_coarse import College, Courses
 
-logger = setup_logger()
+
+
+
+
 
 load_dotenv()
+GOOGLE_API_KEY = "AIzaSyAH3VtLUUjjYRssxWJratAU6ezakJ2IF6c"
+SUPABASE_URL = "https://czqyykcerlzhmrsfdfmq.supabase.co"
+SUPABASE_KEY = "sb_publishable_LW0NmZuoNZMydQLDDFUS4w_qrYmiXeW"
+
 
 st.set_page_config(page_title="College Discovery App - Staging", layout="wide")
-
+api_key = os.getenv("GOOGLE_API_KEY", "")
+supabase_url = os.getenv("SUPABASE_URL", "")
+supabase_key = os.getenv("SUPABASE_KEY", "")
 st.title("College Discovery App - Staging Pipeline")
 st.markdown("Discover colleges with AI-powered validation → Push to staging tables for admin review")
 
@@ -28,22 +37,22 @@ with st.sidebar:
     st.subheader("Gemini Configuration")
     
     api_key = st.text_input("Google API Key", 
-                           value=os.getenv("GOOGLE_API_KEY", ""),
+                           value=GOOGLE_API_KEY,
                            type="password",
                            help="Get your key from https://makersuite.google.com/app/apikey")
     
-    model_options = ["gemini-2.0-flash-exp", "gemini-1.5-pro", "gemini-1.5-flash"]
+    model_options = ["gemini-2.0-flash", "gemini-2.5-flash","gemini-2.0-flash-exp", "gemini-1.5-pro", "gemini-1.5-flash"]
     model = st.selectbox("Select Model", model_options, index=0)
     
     st.markdown("---")
     
     st.subheader("Supabase Configuration")
     supabase_url = st.text_input("Supabase URL", 
-                                 value=os.getenv("SUPABASE_URL", ""),
+                                 value=SUPABASE_URL,
                                  type="password",
                                  help="Your Supabase project URL")
     supabase_key = st.text_input("Supabase Key", 
-                                value=os.getenv("SUPABASE_KEY", ""),
+                                value=SUPABASE_KEY,
                                 type="password",
                                 help="Your Supabase anon/service role key")
     
@@ -112,20 +121,165 @@ col1, col2 = st.columns(2)
 with col1:
     location = st.text_input("Location (city/state):", placeholder="e.g., Bangalore, Karnataka")
 with col2:
-    stream_path = st.text_input("Streams Path (Optional):", 
+    career_path = st.text_input("Stream:", 
                                placeholder="e.g., Data Science, Engineering")
-
-# Additional filters requested: Course Category, Specialization, University Name
-col3, col4, col5 = st.columns(3)
+col3, col4 = st.columns(2)
 with col3:
-    course_category = st.text_input("Course Category (Optional):", placeholder="e.g., Undergraduate, Postgraduate")
+    specialization = st.text_input("Specialization:", placeholder="e.g., Science, Arts")
 with col4:
-    career_path = st.text_input("Career Path (Optional):", placeholder="e.g., Machine Learning, Civil")
-with col5:
-    university_name = st.text_input("University Name (Optional):", placeholder="e.g., Bangalore University")
-
+    university_name = st.text_input("University:", placeholder="e.g., VTU, Bangalore University")                              
+st.session_state["specialization"] = specialization
+st.session_state["university_name"] = university_name
 st.info("**Tip:** Leave Career Path empty to discover all colleges and courses, or specify to filter results.")
+if supabase_url and supabase_key:
+        if st.button("Fetch Saved Search Criteria", type="primary", use_container_width=True):
+            st.session_state["fetch_triggered"] = True
+        if st.session_state.get("fetch_triggered"):
+            supabase = SupabaseIntegration(supabase_url, supabase_key)
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            
+                async def fetch_search_criteria():
+                    filters = {
+                        "location": location.strip() if location else None,
+                        "career_path": career_path.strip() if career_path else None,"specialization": specialization.strip() if specialization else None,
+                        "university": university_name.strip() if university_name else None
+                        }
+                # Remove None values to avoid unnecessary filters
+                    filters = {k: v for k, v in filters.items() if v is not None}
+                    
+                # Call supabase integration to fetch matching rows
+                    return await supabase.get_search_criteria(filters)
+            
+                results = loop.run_until_complete(fetch_search_criteria())
+                loop.close()
+            
+                if results:
+                    st.success(f"✅ Found {len(results)} saved search criteria")
 
+    # Store selected colleges globally
+                    if "selected_saved_colleges" not in st.session_state:
+                        st.session_state["selected_saved_colleges"] = []
+
+                    all_colleges = []
+                    for idx, row in enumerate(results):
+                        st.markdown(f"### 🔍 Saved Search #{idx+1}")
+                        st.markdown(f"**📍 Location:** {row['location']} | **🎓 Career Path:** {row['career_path']} | **📘 Specialization:** {row['specialization']} | **🏛 University:** {row['university']}")
+
+                        colleges_data = row.get("llm_json", {}).get("colleges", [])
+                        if not colleges_data:
+                            st.warning("⚠️ No colleges found in this saved search.")
+                            continue
+                         # Convert dicts to College objects
+                        row_colleges = []
+                        for c in colleges_data:
+                            courses = [
+                                Courses(
+                                    name=course.get("name"),
+                                    description=course.get("description"),
+                                    duration=course.get("duration"),
+                                    degree_level=course.get("degree_level"),
+                                    seats=course.get("seats"),
+                                    annual_fees=course.get("annual_fees"),
+                                    entrance_exams=course.get("entrance_exams", []),
+                                    specializations=course.get("specializations", []),)
+                                for course in c.get("courses", [])]
+
+                        # Convert dict into College object
+                            college_obj = College(
+                                name=c.get("name"),
+                                description=c.get("description"),
+                                address=c.get("address"),
+                                city=c.get("city"),
+                                state=c.get("state"),
+                                zip_code=c.get("zip_code"),
+                                website=c.get("website"),
+                                email=c.get("email"),
+                                phone=c.get("phone"),
+                                scholarshipdetails=c.get("scholarshipdetails"),
+                                rating=c.get("rating"),
+                                type=c.get("type"),
+                                confidence=c.get("confidence"),
+                                evidence_status=c.get("evidence_status"),
+                                evidence_urls=c.get("evidence_urls", []),
+                                courses=courses)
+
+                           
+                            row_colleges.append(college_obj)
+                    
+
+                        for i, college in enumerate(row_colleges):
+                            checkbox_key = f"saved_{idx}_{i}_{college.name}"
+                            checked = st.session_state.get(checkbox_key, True)
+                            checked = st.checkbox(
+                            f"{college.name} ({len(college.courses)} courses)", value=checked,
+                            key=checkbox_key)
+                            expanded = False  # default collapsed
+                            with st.expander(f"📘 Details — {college.name}", expanded=expanded):
+                                col1, col2 = st.columns([2, 1])
+                                with col1:
+                                    st.markdown(f"**📝 Description:** {college.description[:200]}...")
+                                    st.markdown(f"**📍 Address:** {college.address}")
+                                    st.markdown(f"**🏢 Type:** {college.type}")
+                                    if college.website:
+                                        st.markdown(f"**🌐 Website:** [{college.website}]({college.website})")
+                                    st.markdown(f"**📧 Email:** {college.email}")
+                                    if college.phone:
+                                        st.markdown(f"**📞 Phone:** {college.phone}")
+                                with col2:
+                                    st.metric("Rating", f"{college.rating}/5.0")
+                                    st.metric("Confidence", f"{college.confidence}")
+                                    if college.scholarshipdetails:
+                                        st.info(f"💰 {college.scholarshipdetails[:100]}")
+
+                # Courses
+                                if college.courses: 
+                                    st.markdown("---")
+                                    st.markdown(f"**📚 Courses ({len(college.courses)}):**")
+                                    for course in college.courses:
+                                        st.markdown(f"- **{course.name}**")
+                                        if course.description:
+                                            st.caption(f"   {course.description[:150]}...")
+                                        st.caption(f"   Duration: {course.duration} | Level: {course.degree_level}")
+                                    else:
+                                        st.caption("No course details available.")
+                            if checked:
+                                all_colleges.append(college)
+
+                    st.session_state["selected_saved_colleges"] = all_colleges
+                    st.success(f"{len(all_colleges)} colleges selected for push ✅")
+
+    # Push button for saved search results
+                    if st.button("📤 Push Selected Saved Colleges to Staging", type="primary", use_container_width=True):
+                        if not all_colleges:
+                            st.warning("⚠️ Please select at least one college before pushing.")
+                        else:
+                            try:
+                                supabase = SupabaseIntegration(supabase_url, supabase_key)
+                                push_progress = st.progress(0)
+                                push_status = st.empty()
+
+                                def progress_callback(current, total, college_name):
+                                    push_status.text(f"📤 Pushing: {college_name} ({current}/{total})")
+                                    push_progress.progress(current / total)
+
+                                loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(loop)
+                                results = loop.run_until_complete(supabase.push_colleges_and_courses(all_colleges, progress_callback))
+                                loop.close()
+                                push_status.empty()
+                                push_progress.empty()
+                                st.success(f"✅ Successfully pushed {len(all_colleges)} saved colleges to staging!")
+                            except Exception as e:
+                                st.error(f"❌ Error pushing to Supabase: {e}")
+                else:
+                    st.info("ℹ️ No matching search criteria found")
+
+                
+                
+            except Exception as e:
+                st.error(f"❌ Error fetching search criteria: {e}")
 if api_key:
     try:
         engine = CollegeDiscoveryEngine(api_key=api_key, model=model)
@@ -144,41 +298,30 @@ if st.button("Generate Prompts", type="secondary", use_container_width=True):
             st.session_state["college_prompt"] = ""
         if "course_prompt_template" not in st.session_state:
             st.session_state["course_prompt_template"] = ""
-        # Build combined filter string from optional inputs. Empty items are ignored.
-        filters = []
-        if stream_path:
-            filters.append(f"Streams: {stream_path}")
-        if course_category:
-            filters.append(f"Category: {course_category}")
-        if career_path:
-            filters.append(f"Career Path: {career_path}")
-        if university_name:
-            filters.append(f"University: {university_name}")
+        
+        
+        college_prompt = engine.create_college_list_prompt(location, career_path,st.session_state.get("specialization"),st.session_state.get("university_name"))
 
-        combined_filter = " | ".join(filters) if filters else "All Programs"
 
-    # College prompt: include university filter (if provided) and location context
-    college_prompt = engine.create_college_list_prompt(location, stream_path, career_path, university_name)
-    if university_name:
-        college_prompt = f"Filter: Only return colleges or universities matching the name '{university_name}'.\nLocation: {location}.\n\n" + college_prompt
-    else:
-        college_prompt = f"Location: {location}.\n\n" + college_prompt
 
-    st.session_state["college_prompt"] = college_prompt
 
-    sample_colleges = [
-        type('College', (), {'name': '{COLLEGE_1}', 'website': '{WEBSITE_1}'})(),
-        type('College', (), {'name': '{COLLEGE_2}', 'website': '{WEBSITE_2}'})(),
-    ]
 
-    # Course discovery template: pass combined_filter so the template contains category/specialization/university hints
-    course_prompt = engine.create_batch_course_discovery_prompt(sample_colleges, combined_filter)
-    # Prefix the template with explicit filter info so it is visible/editable in the UI
-    course_prompt = f"Filters: {combined_filter}\n\n" + course_prompt
-    st.session_state["course_prompt_template"] = course_prompt
-    
-    st.success("✅ Prompts generated! You can edit them below before running discovery 👇")
-    st.rerun()
+
+
+        st.session_state["college_prompt"] = college_prompt
+        # Store values for global access
+        
+
+        sample_colleges = [
+            type('College', (), {'name': '{COLLEGE_1}', 'website': '{WEBSITE_1}'})(),
+            type('College', (), {'name': '{COLLEGE_2}', 'website': '{WEBSITE_2}'})(),
+            type('College', (), {'name': '...', 'website': '...'})(),
+        ]
+        course_prompt = engine.create_batch_course_discovery_prompt(sample_colleges, career_path)
+        st.session_state["course_prompt_template"] = course_prompt
+        
+        st.success("✅ Prompts generated! You can edit them below before running discovery 👇")
+        st.rerun()
 
 if st.session_state.get("college_prompt"):
     st.markdown("---")
@@ -217,7 +360,7 @@ if st.session_state.get("college_prompt"):
             st.caption("📋 **Will extract:** name, description, duration, degree_level, seats, annual_fees, entrance_exams, specializations")
     
     if st.button("🔄 Reset Prompts to Default", type="secondary"):
-        st.session_state["college_prompt"] = engine.create_college_list_prompt(location, stream_path, career_path, university_name)
+        st.session_state["college_prompt"] = engine.create_college_list_prompt(location)
         sample_colleges = [
             type('College', (), {'name': '{COLLEGE_1}', 'website': '{WEBSITE_1}'})(),
             type('College', (), {'name': '{COLLEGE_2}', 'website': '{WEBSITE_2}'})(),
@@ -252,15 +395,17 @@ if st.button("Run Discovery", type="primary", use_container_width=True):
                 try:
                     prompt_to_use = st.session_state.get("college_prompt")
                     if not prompt_to_use:
-                        prompt_to_use = engine.create_college_list_prompt(location, stream_path, career_path, university_name)
+                        prompt_to_use = engine.create_college_list_prompt(location)
                     
                     content = await engine._call_gemini(prompt_to_use, max_tokens=6000)
-                    # Use non-greedy match so we don't over-capture across the entire response
-                    json_match = re.search(r'\{.*?\}', content, re.DOTALL)
+                    # 👇 Add this
+                    print("\n===== Gemini Raw Output Start =====\n")
+                    print(content)
+                    print("\n===== Gemini Raw Output End =====\n")
 
+                    json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                    
                     if not json_match:
-                        print("No valid JSON found in response. Raw response preview:")
-                        print(content[:2000])
                         raise ValueError("No valid JSON found in response")
 
                     repaired_json_str = repair_json(json_match.group())
@@ -269,7 +414,7 @@ if st.button("Run Discovery", type="primary", use_container_width=True):
                     return engine._parse_colleges_basic(data, location)
 
                 except Exception as e:
-                    logger.error(f"Error in college list discovery: {e}")
+                    print(f"Error in college list discovery: {e}")
                     return []
             
             colleges = loop.run_until_complete(discover_colleges_with_custom_prompt())
@@ -291,18 +436,7 @@ if st.button("Run Discovery", type="primary", use_container_width=True):
                 
                 async def discover_all_courses_batch():
                     colleges_with_courses = []
-                    # Use combined filter for discovery (includes streams, career_path, category, university)
-                    filters = []
-                    if stream_path:
-                        filters.append(f"Streams: {stream_path}")
-                    if course_category:
-                        filters.append(f"Category: {course_category}")
-                    if career_path:
-                        filters.append(f"Career Path: {career_path}")
-                    if university_name:
-                        filters.append(f"University: {university_name}")
-                    combined_filter = " | ".join(filters) if filters else "All Programs"
-
+                    
                     for i in range(0, len(colleges), batch_size):
                         batch = colleges[i:i+batch_size]
                         batch_num = i // batch_size + 1
@@ -312,8 +446,7 @@ if st.button("Run Discovery", type="primary", use_container_width=True):
                         )
                         step2_progress.progress(batch_num / total_batches)
                         
-                        # Pass the combined filter string to the engine so prompts include category/specialization/university
-                        batch_results = await engine._discover_batch_courses(batch, combined_filter)
+                        batch_results = await engine._discover_batch_courses(batch, career_path)
                         colleges_with_courses.extend(batch_results)
                     
                     return colleges_with_courses
@@ -327,7 +460,7 @@ if st.button("Run Discovery", type="primary", use_container_width=True):
             batch_calls = (len(colleges) + batch_size - 1) // batch_size
             savings = ((single_call_estimate - batch_calls) / single_call_estimate) * 100
             st.info(f"💡 **API Call Optimization:** Used {batch_calls} calls instead of {single_call_estimate} (saved {savings:.0f}%!)")
-
+            
             if career_path:
                 original_count = len(colleges)
                 colleges = [c for c in colleges if len(c.courses) > 0]
@@ -366,9 +499,6 @@ if st.button("Run Discovery", type="primary", use_container_width=True):
             st.session_state["colleges"] = colleges
             st.session_state["location"] = location
             st.session_state["career_path"] = career_path or "All Programs"
-            st.session_state["course_category"] = course_category or ""
-            st.session_state["stream_path"] = stream_path or ""
-            st.session_state["university_name"] = university_name or ""
             st.session_state["validation_enabled"] = enable_validation
             st.session_state["model_used"] = model
 
@@ -429,65 +559,65 @@ if "colleges" in st.session_state:
         st.caption(f"{total_relationships} relationships")
     
     if supabase_url and supabase_key:
+       
         if st.button("Push to Staging Tables", type="primary", use_container_width=True):
-            try:
-                supabase = SupabaseIntegration(supabase_url, supabase_key)
+            if "selected_colleges" not in st.session_state or not st.session_state["selected_colleges"]:
+                st.warning("⚠️ No colleges selected to push.")
+            else:
+                try:
+                    supabase = SupabaseIntegration(supabase_url, supabase_key)
+                    push_progress = st.progress(0)
+                    push_status = st.empty()
+                    def progress_callback(current, total, college_name):
+                        push_status.text(f"📤 Pushing: {college_name} ({current}/{total})")
+                        push_progress.progress(current / total)
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
                 
-                push_progress = st.progress(0)
-                push_status = st.empty()
+                    results = loop.run_until_complete(
+                        supabase.push_colleges_and_courses(st.session_state["selected_colleges"], progress_callback))
                 
-                def progress_callback(current, total, college_name):
-                    push_status.text(f"📤 Pushing: {college_name} ({current}/{total})")
-                    push_progress.progress(current / total)
+                    loop.close()
                 
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
+                    push_status.empty()
+                    push_progress.empty()
                 
-                results = loop.run_until_complete(
-                    supabase.push_colleges_and_courses(colleges, progress_callback)
-                )
+                    st.success(f"✅ Successfully pushed {len(st.session_state['selected_colleges'])} selected colleges to staging tables!")
                 
-                loop.close()
+                    st.markdown("### 📊 Push Statistics")
+                    stat_col1, stat_col2, stat_col3 = st.columns(3)
                 
-                push_status.empty()
-                push_progress.empty()
+                    with stat_col1:
+                        st.metric("Colleges Inserted", results['colleges_inserted'])
+                        st.metric("Colleges Failed", results['colleges_failed'])
                 
-                st.success(f"✅ Successfully pushed to staging tables!")
+                    with stat_col2:
+                        st.metric("Courses Inserted", results['courses_inserted'])
+                        st.metric("Courses Failed", results['courses_failed'])
                 
-                st.markdown("### 📊 Push Statistics")
-                stat_col1, stat_col2, stat_col3 = st.columns(3)
+                    with stat_col3:
+                        st.metric("Relationships Created", results['relationships_created'])
+                        st.metric("Relationships Failed", results['relationships_failed'])
                 
-                with stat_col1:
-                    st.metric("Colleges Inserted", results['colleges_inserted'])
-                    st.metric("Colleges Failed", results['colleges_failed'])
+                    if results['errors']:
+                        with st.expander(f"⚠️ View Errors ({len(results['errors'])})"):
+                            for error in results['errors']:
+                                st.text(error)
                 
-                with stat_col2:
-                    st.metric("Courses Inserted", results['courses_inserted'])
-                    st.metric("Courses Failed", results['courses_failed'])
+                    st.info("""
+                    ✅ **Next Steps:**
+                    1. CMS admin reviews data in staging tables
+                    2. Admin connects jobs to college-course relationships
+                    3. Admin approves and promotes to production tables
                 
-                with stat_col3:
-                    st.metric("Relationships Created", results['relationships_created'])
-                    st.metric("Relationships Failed", results['relationships_failed'])
+                    **Note**: College-course relationships are already created in `st_college_course_jobs` with `job_id=null`
+                    """)
                 
-                if results['errors']:
-                    with st.expander(f"⚠️ View Errors ({len(results['errors'])})"):
-                        for error in results['errors']:
-                            st.text(error)
-                
-                st.info("""
-                ✅ **Next Steps:**
-                1. CMS admin reviews data in staging tables
-                2. Admin connects jobs to college-course relationships
-                3. Admin approves and promotes to production tables
-                
-                **Note**: College-course relationships are already created in `st_college_course_jobs` with `job_id=null`
-                """)
-                
-            except Exception as e:
-                st.error(f"❌ Error pushing to Supabase: {e}")
-                import traceback
-                with st.expander("See error details"):
-                    st.code(traceback.format_exc())
+                except Exception as e:
+                    st.error(f"❌ Error pushing to Supabase: {e}")
+                    import traceback
+                    with st.expander("See error details"):
+                        st.code(traceback.format_exc())
     else:
         st.warning("⚠️ Configure Supabase credentials in sidebar first")
     
@@ -585,13 +715,19 @@ if "colleges" in st.session_state:
     st.markdown("---")
     st.subheader("🏫 College Details (Staging Preview)")
     
-    for college in colleges[:10]:
-        with st.expander(
-            f"**{college.name}** - {college.confidence_level} "
-            f"({college.overall_confidence:.2f}) - {len(college.courses)} courses"
-        ):
+    selected_colleges = []
+    for idx, college in enumerate(colleges):
+        checkbox_key = f"select_{idx}_{college.name}"
+        checked = st.session_state.get(checkbox_key, True)  # default: selected
+        # checked = st.checkbox(f"{college.name} ({len(college.courses)} courses) — Confidence: {college.overall_confidence:.2f}", value=checked, key=checkbox_key)
+         # Build a short list of course names for preview
+        sample_course_names = ", ".join([c.name for c in college.courses[:3]]) if college.courses else "No courses found"
+        checked = st.checkbox(f"{college.name} ({len(college.courses)} courses) — Confidence: {college.overall_confidence:.2f} \n📚 Courses: {sample_course_names}", value=checked, key=checkbox_key)
+        if checked:
+            selected_colleges.append(college)
+
+        with st.expander(f"📘 Details — {college.name}"):
             col1, col2 = st.columns([2, 1])
-            
             with col1:
                 st.markdown(f"**📝 Description:** {college.description[:200]}...")
                 st.markdown(f"**📍 Address:** {college.address}")
@@ -600,13 +736,13 @@ if "colleges" in st.session_state:
                 st.markdown(f"**📧 Email:** {college.email}")
                 if college.phone:
                     st.markdown(f"**📞 Phone:** {college.phone}")
-            
             with col2:
                 st.metric("Rating", f"{college.rating:.1f}/5.0")
                 st.metric("Confidence", f"{college.overall_confidence:.2f}")
                 if college.scholarshipdetails:
                     st.info(f"💰 {college.scholarshipdetails[:100]}")
-            
+
+    
             if college.courses:
                 st.markdown("---")
                 st.markdown(f"**📚 Sample Courses ({min(3, len(college.courses))} of {len(college.courses)}):**")
@@ -615,5 +751,22 @@ if "colleges" in st.session_state:
                     st.caption(f"   {course.description[:150]}..." if len(course.description) > 150 else f"   {course.description}")
                     st.caption(f"   Duration: {course.duration} | Level: {course.degree_level}")
     
-    if len(colleges) > 10:
-        st.info(f"Showing 10 of {len(colleges)} colleges. Download CSV/JSON for complete data.")
+    
+
+    st.session_state["selected_colleges"] = selected_colleges
+    st.success(f"{len(selected_colleges)} colleges selected for push.")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

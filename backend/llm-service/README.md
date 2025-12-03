@@ -63,40 +63,12 @@ graph LR
 git clone https://github.com/devpifinity/Disha.git
 cd Disha
 ```
----
 
-### 2. How to Set Up a Virtual Environment, Install Dependencies, and Activate the Virtual Environment
-
-#### Create a Virtual Environment (venv)
-
-1. Navigate to the **backend** folder
-2. Navigate to the **llm-service** folder
-3. Run the following command to create a virtual environment:
-
-```bash
-python -m venv venv
-```
-
-#### Install Dependencies from `requirements.txt`
+### 2. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
-#### Activate the Virtual Environment
-
-**Windows:**
-
-```bash
-venv\Scripts\activate
-```
-
-**Mac/Linux:**
-
-```bash
-source venv/bin/activate
-```
-
----
 
 ### 3. Environment Configuration
 
@@ -132,24 +104,13 @@ college-discovery-app/
 
 ---
 
-## Running the Backend Application Locally
+## Running Locally
 
-### Steps to Start the Backend
-
-1. Navigate to the backend folder
-2. Navigate to the `llm-service` folder
-3. Activate the virtual environment:
-
-```bash
-venv\Scripts\activate
-```
-
-4. Run the Backend (Streamlit) application:
+### Start the Application
 
 ```bash
 streamlit run app.py
 ```
----
 
 The application will open in your default browser at `http://localhost:8501`
 

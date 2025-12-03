@@ -6,9 +6,6 @@ from datetime import datetime
 from models.college import College, Course, VerificationStatus, EvidenceStatus
 import google.generativeai as genai
 from json_repair import repair_json
-from utils.logger import setup_logger
-
-logger = setup_logger()
 
 class CollegeDiscoveryEngine:
     def __init__(self, api_key: str, model: str = None):
@@ -20,66 +17,74 @@ class CollegeDiscoveryEngine:
     def _get_default_model(self) -> str:
         """Get default Gemini model"""
         return os.getenv("LLM_MODEL", "gemini-2.0-flash-exp")
-
-    def create_college_list_prompt(self, location: str, stream_path: Optional[str] = None,
-                                   career_path: Optional[str] = None,
-                                   university_name: Optional[str] = None) -> str:
-        """Create prompt for discovering colleges
-
-        Args:
-            location: location string (city/state)
-            stream_path: optional streams filter (e.g., Science, Commerce). If None, prompt will request all streams.
-        """
-        # Build conditional pieces so the prompt reads naturally depending on inputs
-        streams_text = f"Include stream : {stream_path}" if stream_path else "ALL streams"
-        career_text = f"Include career path : {career_path}" if career_path else "ALL Career Paths"
-        university_text = f"Include university name : {university_name}" if university_name else "ALL Universities"
+    def create_college_list_prompt(self, location: str, career_path: str = None, specialization: str = None, university: str = None) -> str:
+        if career_path:
+            stream_text = f"Include ONLY Stream: {career_path}"
+        else:
+            stream_text = "Include ALL streams: Engineering, Medical, Arts, Commerce, Science, Management, etc."
+        if specialization:
+            specialization_text = f"Include ONLY Specialization: {specialization}"
+        else:
+            specialization_text = "Include ALL specializations"
+        if university:
+            university_text = f"Include ONLY University: {university}"
+        else:
+            university_text = "Include ALL universities"
 
         return f"""
         You are an expert educational consultant specializing in Indian higher education.
-        Task: Find ALL colleges and universities in {location}.
+
+        Task: Find at most 2 colleges and universities in {location}.
 
         Requirements:
-        1. Only include colleges physically located in {location}.
+        1. Only include colleges physically located in {location}
+             - Do NOT include any colleges from other cities or states.
         2. Include ALL types: Government, Private, Deemed, Central, State Universities.
-        3. {streams_text}.
-        4. {career_text}.
-        5. {university_text}.
-        6. Include detailed information for each college (address, contact, website, scholarships, rating, type).
-        7. Be comprehensive - aim for 40-60 colleges if available in the location.
-        8. Provide accurate, verifiable information.
+        3. {stream_text}
+        4. {specialization_text}
+        5. {university_text}
+        6. Be comprehensive — aim for 40-60 colleges if available in the location.
+        7. Provide accurate, verifiable information. Use official and authoritative sources, such as:
+            - AICTE approved institute lists
+            - VTU / local university affiliated colleges for the region
+            - "{location.split(',')[-1].strip()}" state education portals
+            - Official college websites
+        8. Restrict results ONLY to colleges affiliated to or part of: {university_text}
+        9. Prioritize colleges offering courses in: {career_path if career_path else "Engineering, Medical, Arts, Commerce, Science, Management, etc."}
 
         Output Format (JSON):
         {{
         "colleges": [
             {{
-            "name": "Exact college name",
-            "description": "Brief description of the college (2-3 sentences about its establishment, reputation, and programs)",
-            "address": "Full street address of the college",
-            "city": "City name",
-            "state": "State name",
-            "zip_code": "PIN code/ZIP code",
-            "website": "https://official-college-domain.ac.in",
-            "email": "contact@college.edu.in",
-            "phone": "+91-XXX-XXXXXXX",
-            "scholarshipdetails": "Brief overview of scholarships available (if known)",
-            "rating": 4.2,
-            "type": "government|private|deemed|central|state",
-            "confidence": 0.85
+                "name": "Exact college name",
+                "description": "Brief description of the college (2-3 sentences about its establishment, reputation, and programs)",
+                "address": "Full street address of the college",
+                "city": "City name",
+                "state": "State name",
+                "zip_code": "PIN code/ZIP code",
+                "website": "https://official-college-domain.ac.in",
+                "email": "contact@college.edu.in",
+                "phone": "+91-XXX-XXXXXXX",
+                "scholarshipdetails": "Brief overview of scholarships available (if known)",
+                "rating": 4.2,
+                "type": "government|private|deemed|central|state",
+                "confidence": 0.85
             }}
-        ]
+                ]
         }}
 
         Important Guidelines:
-        - Focus on well-known, established institutions.
-        - Use confidence scores between 0.6-0.95 (be realistic).
-        - Prioritize colleges with official websites.
-        - Include as many colleges as possible from {location}.
-        - For rating: use scale of 1.0-5.0 based on reputation (if unknown, use 3.5).
+        - Do NOT exclude any college listed on official sources within {location}
+        - Focus on well-known, established institutions but include verified smaller colleges as well.
+        - Use confidence scores between 0.6-0.95 realistically.
+        - Prioritize official websites where available.
+        - Include as many colleges as possible from {location}
+        - For rating: use a scale of 1.0–5.0 based on reputation; if unknown, use 3.5.
         - For scholarshipdetails: mention merit-based, need-based, government schemes if known.
         - If email/phone not known, try to infer from website domain.
         - Do NOT include course information (that will be fetched separately).
         """
+
     
     def create_batch_course_discovery_prompt(self, colleges: List[College], career_path: str = None) -> str:
         """Create BATCH prompt for discovering courses - Updated for staging table schema"""
@@ -89,6 +94,7 @@ class CollegeDiscoveryEngine:
             f"{i+1}. {c.name} - {c.website}" 
             for i, c in enumerate(colleges)
         ])
+        
 
         return f"""
         You are an expert educational consultant specializing in Indian higher education.
@@ -99,6 +105,7 @@ class CollegeDiscoveryEngine:
         {college_list}
 
         Requirements for EACH college:{career_filter}
+        -Only include courses actually offered by the college (verify using official sources: college websites, AICTE/UGC/VTU listings, or other authoritative sources)
         - List ALL undergraduate and postgraduate courses offered
         - Include certificates, diplomas, and doctoral programs
         - Provide detailed course information
@@ -192,6 +199,10 @@ class CollegeDiscoveryEngine:
 
         try:
             content = await self._call_gemini(prompt, max_tokens=6000)
+            # 🐞 Debug: print Gemini raw response
+            print("\n================ GEMINI RAW OUTPUT START ================\n")
+            print(content)
+            print("\n================ GEMINI RAW OUTPUT END ==================\n")
             json_match = re.search(r'\{.*\}', content, re.DOTALL)
 
             if not json_match:
@@ -201,8 +212,8 @@ class CollegeDiscoveryEngine:
             try:
                 data = json.loads(raw_json)
             except json.JSONDecodeError as e:
-                logger.warning("Invalid JSON detected. Attempting repair")
-                logger.error(f"JSON error: {e}")
+                print("Invalid JSON detected. Attempting repair")
+                print(f"JSON error: {e}")
 
                 repaired = repair_json(raw_json)
                 data = json.loads(repaired)
@@ -210,7 +221,7 @@ class CollegeDiscoveryEngine:
             return self._parse_colleges_basic(data, location)
         
         except Exception as e:
-            logger.error(f"Error in college list discovery {e}")
+            print(f"Error in college list discovery {e}")
             return []
         
     async def _discover_batch_courses(self, colleges: List[College],
@@ -223,22 +234,22 @@ class CollegeDiscoveryEngine:
             json_match = re.search(r'\{.*\}', content, re.DOTALL)
 
             if not json_match:
-                logger.warning(f"No valid JSON found for batch")
+                print(f"No valid JSON found for batch")
                 return colleges
             
             raw_json = json_match.group()
             try:
                 data = json.loads(raw_json)
             except json.JSONDecodeError as e:
-                logger.warning("Invalid JSON detected in batch. Attempting repair")
-                logger.error(f"JSON error: {e}")
+                print("Invalid JSON detected in batch. Attempting repair")
+                print(f"JSON error: {e}")
                 repaired = repair_json(raw_json)
                 data = json.loads(repaired)
 
             return self._merge_batch_results(colleges, data)
         
         except Exception as e:
-            logger.error(f"Error discovering batch courses: {e}")
+            print(f"Error discovering batch courses: {e}")
             return colleges
         
     async def _call_gemini(self, prompt: str, max_tokens: int = 4000, use_search: bool = False) -> str:
@@ -296,7 +307,7 @@ class CollegeDiscoveryEngine:
                 )
                 colleges.append(college)
             except Exception as e:
-                logger.error(f"Error parsing college data: {e}")
+                print(f"Error parsing college data: {e}")
                 continue
 
         return colleges
@@ -339,7 +350,18 @@ class CollegeDiscoveryEngine:
                 )
                 courses.append(course)
             except Exception as e:
-                logger.error(f"Error parsing course data: {e}")
+                print(f"Error parsing course data: {e}")
                 continue
         return courses
+
+
+
+
+
+
+
+
+
+
+
 
